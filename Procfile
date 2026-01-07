@@ -1,2 +1,2 @@
-web: python run_fastapi.py
+web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-5001}
 

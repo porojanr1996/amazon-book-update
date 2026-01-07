@@ -1,0 +1,17 @@
+# Google Sheets Configuration
+GOOGLE_SHEETS_CREDENTIALS_PATH=credentials.json
+GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id_here
+
+# Website Configuration
+FLASK_ENV=production
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+
+# Scheduler Configuration
+SCHEDULE_TIME=10:00
+SCHEDULE_TIMEZONE=Europe/Bucharest
+
+# Amazon Scraping Configuration
+AMAZON_DELAY_BETWEEN_REQUESTS=2
+AMAZON_RETRY_ATTEMPTS=3
+

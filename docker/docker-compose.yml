@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sheets-service:
+    build:
+      context: ..
+      dockerfile: docker/sheets-service.Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVICE_ENV=production
+      - SHEETS_SERVICE_PORT=8001
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - GOOGLE_SHEETS_CREDENTIALS_PATH=/app/credentials.json
+      - GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID}
+    volumes:
+      - ../credentials.json:/app/credentials.json:ro
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  scraper-service:
+    build:
+      context: ..
+      dockerfile: docker/scraper-service.Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - SERVICE_ENV=production
+      - SCRAPER_SERVICE_PORT=8002
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - AMAZON_DELAY_BETWEEN_REQUESTS=8
+      - AMAZON_RETRY_ATTEMPTS=3
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-service:
+    build:
+      context: ..
+      dockerfile: docker/api-service.Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - SERVICE_ENV=production
+      - API_SERVICE_PORT=5001
+      - SHEETS_SERVICE_URL=http://sheets-service:8001
+      - SCRAPER_SERVICE_URL=http://scraper-service:8002
+      - REDIS_CACHE_URL=redis://redis:6379/1
+    depends_on:
+      - sheets-service
+      - scraper-service
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker-service:
+    build:
+      context: ..
+      dockerfile: docker/worker-service.Dockerfile
+    environment:
+      - SERVICE_ENV=production
+      - SHEETS_SERVICE_URL=http://sheets-service:8001
+      - SCRAPER_SERVICE_URL=http://scraper-service:8002
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - GOOGLE_SHEETS_CREDENTIALS_PATH=/app/credentials.json
+      - GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID}
+    volumes:
+      - ../credentials.json:/app/credentials.json:ro
+    depends_on:
+      - sheets-service
+      - scraper-service
+      - redis
+    command: celery -A celery_app worker --loglevel=info
+
+volumes:
+  redis_data:
+

@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Credentials (NU pune în Git!)
+credentials.json
+*.json
+!package.json
+!package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Backup files
+backup_*/
+*.backup
+*.bak
+
+# Amazon scraping failures
+amazon_scraping_failures.jsonl
+failed_books_report.json
+
+# Debug files
+debug_*.html
+test_*.html
+
+# Elastic Beanstalk
+.elasticbeanstalk/
+*.pyc
+
+# Docker
+docker-compose.override.yml
+
+# Temporary
+*.tmp
+*.temp
+/tmp/
+
+# Excel files (dacă nu vrei să le incluzi)
+*.xlsx
+*.xls
+
+# Secrets (dacă există)
+secrets/
+*.pem
+*.key

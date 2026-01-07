@@ -1,0 +1,65 @@
+name: Deploy to AWS Elastic Beanstalk
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:  # Permite trigger manual
+
+env:
+  AWS_REGION: eu-north-1
+  EB_APPLICATION_NAME: books-reporting-app
+  EB_ENVIRONMENT_NAME: books-reporting-env
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+    
+    - name: Install EB CLI
+      run: |
+        pip install awsebcli
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Initialize EB (if needed)
+      run: |
+        if [ ! -d ".elasticbeanstalk" ]; then
+          eb init -p python-3.13 ${{ env.EB_APPLICATION_NAME }} --region ${{ env.AWS_REGION }} --non-interactive
+        fi
+    
+    - name: Set environment variables
+      run: |
+        eb setenv \
+          GOOGLE_SHEETS_SPREADSHEET_ID="${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}" \
+          REDIS_URL="${{ secrets.REDIS_URL }}" \
+          REDIS_CACHE_URL="${{ secrets.REDIS_CACHE_URL }}" \
+          FLASK_HOST="0.0.0.0" \
+          FLASK_PORT="5001" \
+          AMAZON_DELAY_BETWEEN_REQUESTS="8" \
+          AMAZON_RETRY_ATTEMPTS="3" \
+          AMAZON_MAX_WORKERS="1" \
+          FLASK_ENV="production" \
+          --environment ${{ env.EB_ENVIRONMENT_NAME }}
+    
+    - name: Deploy to Elastic Beanstalk
+      run: |
+        eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged
+    
+    - name: Health check
+      run: |
+        sleep 30  # Wait for deployment
+        eb health --refresh --environment ${{ env.EB_ENVIRONMENT_NAME }}
+

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amazon Best Sellers</title>
+    <link rel="stylesheet" href="{{ url_for('css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script>
+        // Register zoom plugin and verify date adapter for Chart.js v4
+        if (typeof Chart !== 'undefined') {
+            if (typeof chartjsPluginZoom !== 'undefined') {
+                Chart.register(chartjsPluginZoom);
+                console.log('✅ Zoom plugin registered');
+            }
+            
+            // Verify date adapter is loaded
+            if (typeof Chart._adapters !== 'undefined' && Chart._adapters._date) {
+                console.log('✅ Date adapter is available');
+            } else {
+                console.error('❌ Date adapter not found! Chart.js time scale will not work.');
+            }
+        } else {
+            console.error('❌ Chart.js not loaded!');
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <h1>Amazon Best Sellers</h1>
+            <p class="subtitle">Most sold book 1's based on sales. Updated Daily.</p>
+        </header>
+
+        <div class="main-layout">
+            <!-- Sidebar with worksheet filters -->
+            <aside class="sidebar">
+                <h3>Filters</h3>
+                <div id="worksheetList" class="worksheet-list">
+                    <!-- Worksheets will be loaded here -->
+                </div>
+            </aside>
+
+            <!-- Main content -->
+            <main class="main-content">
+            <section class="chart-section">
+                    <div class="chart-header">
+                        <h2 id="chartTitle">Average Book1's Market Ranks</h2>
+                        <div class="time-filters">
+                            <button class="time-filter-btn" data-range="1">24 Hours</button>
+                            <button class="time-filter-btn" data-range="7">7 Days</button>
+                            <button class="time-filter-btn active" data-range="30">30 Days</button>
+                            <button class="time-filter-btn" data-range="90">90 Days</button>
+                            <button class="time-filter-btn" data-range="365">1 Year</button>
+                            <button class="time-filter-btn" data-range="all">All Time</button>
+                        </div>
+                    </div>
+                <div class="chart-container">
+                    <canvas id="bsrChart"></canvas>
+                </div>
+            </section>
+
+            <section class="rankings-section">
+                    <div class="rankings-header">
+                        <h2 id="rankingsTitle">Book 1's Best Sellers</h2>
+                    </div>
+                <div id="rankingsContainer" class="rankings-grid">
+                    <!-- Rankings will be loaded here -->
+                </div>
+            </section>
+        </main>
+        </div>
+    </div>
+
+    <script src="{{ url_for('js/app.js') }}"></script>
+</body>
+</html>
+

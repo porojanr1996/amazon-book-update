@@ -1,0 +1,4 @@
+"""
+Shared code for microservices
+"""
+

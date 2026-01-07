@@ -55,18 +55,7 @@ jobs:
           echo "*.cfg.yml" > .elasticbeanstalk/.gitignore
         fi
     
-    - name: Check if environment exists
-      id: check_env
-      run: |
-        if eb list | grep -q "${{ env.EB_ENVIRONMENT_NAME }}"; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-          echo "⚠️ Environment does not exist. Please create it manually in AWS Console first."
-        fi
-    
-    - name: Set environment variables (if environment exists)
-      if: steps.check_env.outputs.exists == 'true'
+    - name: Set environment variables
       run: |
         eb setenv \
           GOOGLE_SHEETS_SPREADSHEET_ID="${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}" \
@@ -78,22 +67,11 @@ jobs:
           AMAZON_RETRY_ATTEMPTS="3" \
           AMAZON_MAX_WORKERS="1" \
           FLASK_ENV="production" \
-          --environment ${{ env.EB_ENVIRONMENT_NAME }} || true
+          --environment ${{ env.EB_ENVIRONMENT_NAME }} || echo "⚠️ Could not set env vars (may already be set)"
     
     - name: Deploy to Elastic Beanstalk
-      if: steps.check_env.outputs.exists == 'true'
       run: |
         eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged
-    
-    - name: Error if environment does not exist
-      if: steps.check_env.outputs.exists == 'false'
-      run: |
-        echo "❌ Environment '${{ env.EB_ENVIRONMENT_NAME }}' does not exist!"
-        echo "Please create it manually in AWS Console:"
-        echo "1. Go to: https://console.aws.amazon.com/elasticbeanstalk/"
-        echo "2. Create environment: ${{ env.EB_ENVIRONMENT_NAME }}"
-        echo "3. Platform: Python 3.13"
-        exit 1
     
     - name: Health check
       run: |

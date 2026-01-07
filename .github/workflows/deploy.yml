@@ -69,6 +69,17 @@ jobs:
           FLASK_ENV="production" \
           --environment ${{ env.EB_ENVIRONMENT_NAME }} || echo "⚠️ Could not set env vars (may already be set)"
     
+    - name: Check environment health
+      run: |
+        echo "Checking environment health..."
+        HEALTH=$(eb health --refresh --environment ${{ env.EB_ENVIRONMENT_NAME }} --json | jq -r '.HealthStatus' || echo "Unknown")
+        echo "Current health: $HEALTH"
+        if [ "$HEALTH" != "Ok" ] && [ "$HEALTH" != "Unknown" ]; then
+          echo "⚠️ Environment health is $HEALTH. Waiting for Ready state..."
+          echo "Please wait for environment to become Ready, then retry deployment."
+          exit 1
+        fi
+    
     - name: Deploy to Elastic Beanstalk
       run: |
         eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged

@@ -78,7 +78,7 @@ jobs:
     
     - name: Deploy to Elastic Beanstalk
       run: |
-        eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged
+        eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged --timeout 20
     
     - name: Health check
       run: |

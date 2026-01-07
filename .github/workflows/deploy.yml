@@ -8,7 +8,7 @@ on:
 env:
   AWS_REGION: eu-north-1
   EB_APPLICATION_NAME: books-reporting-app
-  EB_ENVIRONMENT_NAME: books-reporting-env
+  EB_ENVIRONMENT_NAME: Books-reporting-app-env
 
 jobs:
   deploy:

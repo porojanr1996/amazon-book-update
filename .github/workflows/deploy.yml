@@ -37,10 +37,36 @@ jobs:
     - name: Initialize EB (if needed)
       run: |
         if [ ! -d ".elasticbeanstalk" ]; then
-          eb init -p python-3.13 ${{ env.EB_APPLICATION_NAME }} --region ${{ env.AWS_REGION }} --non-interactive
+          # Create .elasticbeanstalk directory
+          mkdir -p .elasticbeanstalk
+          
+          # Create config.yml for EB
+          cat > .elasticbeanstalk/config.yml << EOF
+        branch-defaults:
+          main:
+            environment: ${{ env.EB_ENVIRONMENT_NAME }}
+        global:
+          application_name: ${{ env.EB_APPLICATION_NAME }}
+          default_region: ${{ env.AWS_REGION }}
+          default_platform: python-3.13
+        EOF
+          
+          # Initialize EB with platform
+          echo "y" | eb init ${{ env.EB_APPLICATION_NAME }} -p python-3.13 -r ${{ env.AWS_REGION }} || true
         fi
     
-    - name: Set environment variables
+    - name: Check if environment exists
+      id: check_env
+      run: |
+        if eb list | grep -q "${{ env.EB_ENVIRONMENT_NAME }}"; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ Environment does not exist. Please create it manually in AWS Console first."
+        fi
+    
+    - name: Set environment variables (if environment exists)
+      if: steps.check_env.outputs.exists == 'true'
       run: |
         eb setenv \
           GOOGLE_SHEETS_SPREADSHEET_ID="${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}" \
@@ -52,11 +78,22 @@ jobs:
           AMAZON_RETRY_ATTEMPTS="3" \
           AMAZON_MAX_WORKERS="1" \
           FLASK_ENV="production" \
-          --environment ${{ env.EB_ENVIRONMENT_NAME }}
+          --environment ${{ env.EB_ENVIRONMENT_NAME }} || true
     
     - name: Deploy to Elastic Beanstalk
+      if: steps.check_env.outputs.exists == 'true'
       run: |
         eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged
+    
+    - name: Error if environment does not exist
+      if: steps.check_env.outputs.exists == 'false'
+      run: |
+        echo "❌ Environment '${{ env.EB_ENVIRONMENT_NAME }}' does not exist!"
+        echo "Please create it manually in AWS Console:"
+        echo "1. Go to: https://console.aws.amazon.com/elasticbeanstalk/"
+        echo "2. Create environment: ${{ env.EB_ENVIRONMENT_NAME }}"
+        echo "3. Platform: Python 3.13"
+        exit 1
     
     - name: Health check
       run: |

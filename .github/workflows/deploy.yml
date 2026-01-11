@@ -69,29 +69,6 @@ jobs:
           FLASK_ENV="production" \
           --environment ${{ env.EB_ENVIRONMENT_NAME }} || echo "⚠️ Could not set env vars (may already be set)"
     
-    - name: Wait for environment to be Ready
-      run: |
-        echo "Waiting for environment to be Ready..."
-        MAX_WAIT=300  # 5 minutes max wait
-        ELAPSED=0
-        while [ $ELAPSED -lt $MAX_WAIT ]; do
-          STATUS=$(eb status ${{ env.EB_ENVIRONMENT_NAME }} 2>&1 | grep -i "Status" | head -1 | awk '{print $2}' || echo "Unknown")
-          echo "Current status: $STATUS (waited ${ELAPSED}s)"
-          if [ "$STATUS" = "Ready" ]; then
-            echo "✅ Environment is Ready!"
-            break
-          fi
-          if [ "$STATUS" = "Terminated" ] || [ "$STATUS" = "Terminating" ]; then
-            echo "❌ Environment is being terminated. Cannot deploy."
-            exit 1
-          fi
-          sleep 10
-          ELAPSED=$((ELAPSED + 10))
-        done
-        if [ $ELAPSED -ge $MAX_WAIT ]; then
-          echo "⚠️ Environment did not become Ready within ${MAX_WAIT}s. Attempting deployment anyway..."
-        fi
-    
     - name: Deploy to Elastic Beanstalk
       run: |
         eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged --timeout 20

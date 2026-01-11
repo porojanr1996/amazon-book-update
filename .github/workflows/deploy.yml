@@ -34,49 +34,50 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
     
-    - name: Initialize EB (if needed)
+    - name: Initialize EB
       run: |
-        if [ ! -d ".elasticbeanstalk" ]; then
-          # Create .elasticbeanstalk directory and config
-          mkdir -p .elasticbeanstalk
-          
-          # Create config.yml for EB
-          cat > .elasticbeanstalk/config.yml << EOF
+        # Always initialize EB (will skip if already initialized)
+        echo "Initializing EB..."
+        eb init \
+          --platform python-3.13 \
+          --region ${{ env.AWS_REGION }} \
+          --non-interactive || echo "⚠️ EB init may have failed, continuing..."
+        
+        # Create/update config.yml
+        mkdir -p .elasticbeanstalk
+        cat > .elasticbeanstalk/config.yml << EOF
         branch-defaults:
           main:
             environment: ${{ env.EB_ENVIRONMENT_NAME }}
         global:
-          application_name: ${{ env.EB_APPLICATION_NAME }}
           default_region: ${{ env.AWS_REGION }}
           default_platform: python-3.13
         EOF
-          
-          # Create .gitignore in .elasticbeanstalk
-          echo "*.cfg.yml" > .elasticbeanstalk/.gitignore
-        else
-          # Update config if it exists
-          if [ -f ".elasticbeanstalk/config.yml" ]; then
-            # Ensure environment name is correct
-            sed -i "s/environment:.*/environment: ${{ env.EB_ENVIRONMENT_NAME }}/" .elasticbeanstalk/config.yml || true
-            sed -i "s/application_name:.*/application_name: ${{ env.EB_APPLICATION_NAME }}/" .elasticbeanstalk/config.yml || true
-          fi
-        fi
-    
-    - name: Verify EB configuration and get application name
-      run: |
-        echo "Verifying EB configuration..."
-        eb list || echo "⚠️ Could not list environments"
         
-        # Get application name from environment
-        APP_NAME=$(eb status ${{ env.EB_ENVIRONMENT_NAME }} 2>&1 | grep -i "Application" | head -1 | awk '{print $2}' || echo "")
-        if [ -n "$APP_NAME" ]; then
-          echo "Detected application name: $APP_NAME"
+        echo "✅ EB initialized"
+    
+    - name: Get application name from environment
+      run: |
+        echo "Getting application name from environment..."
+        # Try to get app name from environment status
+        APP_INFO=$(eb status ${{ env.EB_ENVIRONMENT_NAME }} 2>&1 || echo "")
+        APP_NAME=$(echo "$APP_INFO" | grep -i "Application" | head -1 | awk '{print $2}' || echo "")
+        
+        if [ -n "$APP_NAME" ] && [ "$APP_NAME" != "Application" ]; then
+          echo "✅ Detected application name: $APP_NAME"
           # Update config with detected application name
           if [ -f ".elasticbeanstalk/config.yml" ]; then
-            sed -i "s/application_name:.*/application_name: $APP_NAME/" .elasticbeanstalk/config.yml || true
+            # Add application_name if not exists, or update it
+            if grep -q "application_name:" .elasticbeanstalk/config.yml; then
+              sed -i "s/application_name:.*/application_name: $APP_NAME/" .elasticbeanstalk/config.yml
+            else
+              sed -i "/global:/a\  application_name: $APP_NAME" .elasticbeanstalk/config.yml
+            fi
           fi
         else
-          echo "⚠️ Could not detect application name, using default"
+          echo "⚠️ Could not detect application name automatically"
+          echo "Environment info:"
+          echo "$APP_INFO" | head -10
         fi
     
     - name: Set environment variables

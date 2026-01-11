@@ -53,7 +53,20 @@ jobs:
           
           # Create .gitignore in .elasticbeanstalk
           echo "*.cfg.yml" > .elasticbeanstalk/.gitignore
+        else
+          # Update config if it exists
+          if [ -f ".elasticbeanstalk/config.yml" ]; then
+            # Ensure environment name is correct
+            sed -i "s/environment:.*/environment: ${{ env.EB_ENVIRONMENT_NAME }}/" .elasticbeanstalk/config.yml || true
+            sed -i "s/application_name:.*/application_name: ${{ env.EB_APPLICATION_NAME }}/" .elasticbeanstalk/config.yml || true
+          fi
         fi
+    
+    - name: Verify EB configuration
+      run: |
+        echo "Verifying EB configuration..."
+        eb list || echo "⚠️ Could not list environments"
+        eb status ${{ env.EB_ENVIRONMENT_NAME }} || echo "⚠️ Could not get environment status"
     
     - name: Set environment variables
       run: |
@@ -71,7 +84,7 @@ jobs:
     
     - name: Deploy to Elastic Beanstalk
       run: |
-        eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --staged --timeout 20
+        eb deploy ${{ env.EB_ENVIRONMENT_NAME }} --timeout 20
     
     - name: Health check
       run: |

@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: eu-north-1
-  EB_APPLICATION_NAME: books-reporting-app
+  # EB_APPLICATION_NAME va fi detectat automat din environment
   EB_ENVIRONMENT_NAME: Books-amazon-env-env
 
 jobs:
@@ -62,11 +62,22 @@ jobs:
           fi
         fi
     
-    - name: Verify EB configuration
+    - name: Verify EB configuration and get application name
       run: |
         echo "Verifying EB configuration..."
         eb list || echo "⚠️ Could not list environments"
-        eb status ${{ env.EB_ENVIRONMENT_NAME }} || echo "⚠️ Could not get environment status"
+        
+        # Get application name from environment
+        APP_NAME=$(eb status ${{ env.EB_ENVIRONMENT_NAME }} 2>&1 | grep -i "Application" | head -1 | awk '{print $2}' || echo "")
+        if [ -n "$APP_NAME" ]; then
+          echo "Detected application name: $APP_NAME"
+          # Update config with detected application name
+          if [ -f ".elasticbeanstalk/config.yml" ]; then
+            sed -i "s/application_name:.*/application_name: $APP_NAME/" .elasticbeanstalk/config.yml || true
+          fi
+        else
+          echo "⚠️ Could not detect application name, using default"
+        fi
     
     - name: Set environment variables
       run: |

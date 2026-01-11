@@ -58,18 +58,23 @@ services:
   api-service:
     build:
       context: ..
-      dockerfile: docker/api-service.Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "5001:5001"
     environment:
-      - SERVICE_ENV=production
-      - API_SERVICE_PORT=5001
-      - SHEETS_SERVICE_URL=http://sheets-service:8001
-      - SCRAPER_SERVICE_URL=http://scraper-service:8002
+      - GOOGLE_SHEETS_CREDENTIALS_PATH=/app/credentials.json
+      - GOOGLE_SHEETS_SPREADSHEET_ID=${GOOGLE_SHEETS_SPREADSHEET_ID}
+      - REDIS_URL=redis://redis:6379/0
       - REDIS_CACHE_URL=redis://redis:6379/1
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5001
+      - FLASK_ENV=production
+      - AMAZON_DELAY_BETWEEN_REQUESTS=8
+      - AMAZON_RETRY_ATTEMPTS=3
+      - AMAZON_MAX_WORKERS=1
+    volumes:
+      - ../credentials.json:/app/credentials.json:ro
     depends_on:
-      - sheets-service
-      - scraper-service
       - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5001/health"]

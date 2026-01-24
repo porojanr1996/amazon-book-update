@@ -162,17 +162,30 @@ def retry_failed_books(failed_books_dict, dry_run=False):
     # Conectare la Google Sheets
     print("📋 Conectare la Google Sheets...")
     try:
-        # Folosește calea absolută dacă nu este setată variabila de mediu
+        # Verifică mai întâi dacă fișierul există la calea specificată
         creds_path = config.GOOGLE_SHEETS_CREDENTIALS_PATH
-        if not os.path.isabs(creds_path) and not os.path.exists(creds_path):
+        
+        # Dacă calea nu există, încearcă alte locații
+        if not os.path.exists(creds_path):
             # Încearcă calea relativă la directorul curent
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            creds_path_abs = os.path.join(script_dir, creds_path)
+            creds_path_abs = os.path.join(script_dir, 'credentials.json')
             if os.path.exists(creds_path_abs):
                 creds_path = creds_path_abs
             else:
                 # Fallback: calea standard pe EC2
-                creds_path = '/home/ec2-user/app/books-reporting/credentials.json'
+                ec2_path = '/home/ec2-user/app/books-reporting/credentials.json'
+                if os.path.exists(ec2_path):
+                    creds_path = ec2_path
+                else:
+                    # Ultimul fallback: calea relativă
+                    creds_path = os.path.join(script_dir, 'credentials.json')
+        
+        print(f"   📄 Folosind credentials: {creds_path}")
+        if not os.path.exists(creds_path):
+            print(f"   ⚠️  ATENȚIE: Fișierul credentials.json nu există la: {creds_path}")
+            print(f"   💡 Verifică că fișierul există sau setează variabila GOOGLE_SHEETS_CREDENTIALS_PATH")
+            return False
         
         sheets_manager = GoogleSheetsManager(
             creds_path,
@@ -181,6 +194,8 @@ def retry_failed_books(failed_books_dict, dry_run=False):
         print("✅ Conectat cu succes")
     except Exception as e:
         print(f"❌ Eroare la conectare: {e}")
+        import traceback
+        print(f"   Detalii: {traceback.format_exc()}")
         return False
     print()
     

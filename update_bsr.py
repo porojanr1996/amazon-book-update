@@ -32,8 +32,34 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
     # Conectare la Google Sheets
     print("📋 Conectare la Google Sheets...")
     try:
+        # Verifică și corectează calea către credentials.json
+        import os
+        creds_path = config.GOOGLE_SHEETS_CREDENTIALS_PATH
+        
+        # Dacă fișierul nu există la calea specificată, încearcă alte locații
+        if not os.path.exists(creds_path):
+            # Încearcă calea relativă la directorul curent
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            creds_path_abs = os.path.join(script_dir, 'credentials.json')
+            if os.path.exists(creds_path_abs):
+                creds_path = creds_path_abs
+            else:
+                # Fallback: calea standard pe EC2
+                ec2_path = '/home/ec2-user/app/books-reporting/credentials.json'
+                if os.path.exists(ec2_path):
+                    creds_path = ec2_path
+                else:
+                    # Ultimul fallback: calea relativă
+                    creds_path = os.path.join(script_dir, 'credentials.json')
+        
+        if not os.path.exists(creds_path):
+            print(f"❌ Fișierul credentials.json nu a fost găsit!")
+            print(f"   Căută la: {creds_path}")
+            print(f"   💡 Setează variabila GOOGLE_SHEETS_CREDENTIALS_PATH sau plasează fișierul în directorul proiectului")
+            return False
+        
         sheets_manager = GoogleSheetsManager(
-            config.GOOGLE_SHEETS_CREDENTIALS_PATH,
+            creds_path,
             config.GOOGLE_SHEETS_SPREADSHEET_ID
         )
         print("✅ Conectat cu succes")

@@ -85,7 +85,7 @@ class BrowserPool:
                 
                 # Create browsers sequentially to avoid event loop conflicts
                 for i in range(self.pool_size):
-                browser = await self.playwright.chromium.launch(
+                    browser = await self.playwright.chromium.launch(
                     headless=self.headless,
                     args=[
                         '--no-sandbox',
@@ -169,7 +169,7 @@ class BrowserPool:
                         get: () => 8
                     });
                 """)
-                
+                    
                     self.browsers.append(browser)
                     self.contexts.append(context)
                     logger.info(f"Initialized browser {i+1}/{self.pool_size}")

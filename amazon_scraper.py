@@ -92,14 +92,21 @@ class AmazonScraper:
         # If Playwright is requested, use it directly
         if use_playwright:
             try:
-                from app.services.playwright_scraper import extract_bsr_with_playwright_sync
+                # Use refactored scraper (production-ready)
+                from app.services.playwright_scraper_refactored import extract_bsr_with_playwright_sync
                 bsr = extract_bsr_with_playwright_sync(amazon_url)
                 if bsr:
                     return bsr
-                # If Playwright fails, try simple method as fallback
-                logger.warning(f"Playwright extraction failed, trying simple method as fallback")
+                # If Playwright returns None, it could be CAPTCHA - don't retry
+                logger.warning(f"Playwright extraction returned None (may be CAPTCHA) - not retrying")
+                return None  # Don't fallback to simple method if CAPTCHA detected
             except Exception as e:
-                logger.warning(f"Playwright extraction failed, trying simple method: {e}")
+                logger.warning(f"Playwright extraction failed: {e}")
+                # Only retry if it's a network error, not CAPTCHA
+                if "captcha" not in str(e).lower():
+                    logger.warning(f"Trying simple method as fallback (not CAPTCHA)")
+                else:
+                    return None  # CAPTCHA - abort
         
         # Clean URL - remove /ref and other parameters that might cause issues
         # Also fix common URL issues like missing slashes

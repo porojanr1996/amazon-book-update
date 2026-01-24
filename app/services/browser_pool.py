@@ -4,6 +4,7 @@ Manages a pool of reusable browser contexts for efficient scraping
 """
 import logging
 import asyncio
+import random
 from typing import Optional, List
 from contextlib import asynccontextmanager
 from threading import Lock
@@ -82,17 +83,62 @@ class BrowserPool:
                     }
                 )
                 
-                # Add stealth scripts to avoid detection
+                # Add comprehensive stealth scripts to avoid detection
                 await context.add_init_script("""
+                    // Remove webdriver property
                     Object.defineProperty(navigator, 'webdriver', {
                         get: () => undefined
                     });
-                    window.chrome = { runtime: {} };
+                    
+                    // Add chrome object
+                    window.chrome = { 
+                        runtime: {},
+                        loadTimes: function() {},
+                        csi: function() {},
+                        app: {}
+                    };
+                    
+                    // Override plugins
                     Object.defineProperty(navigator, 'plugins', {
                         get: () => [1, 2, 3, 4, 5]
                     });
+                    
+                    // Override languages
                     Object.defineProperty(navigator, 'languages', {
                         get: () => ['en-US', 'en']
+                    });
+                    
+                    // Override permissions
+                    const originalQuery = window.navigator.permissions.query;
+                    window.navigator.permissions.query = (parameters) => (
+                        parameters.name === 'notifications' ?
+                            Promise.resolve({ state: Notification.permission }) :
+                            originalQuery(parameters)
+                    );
+                    
+                    // Override getBattery
+                    Object.defineProperty(navigator, 'getBattery', {
+                        get: () => () => Promise.resolve({
+                            charging: true,
+                            chargingTime: 0,
+                            dischargingTime: Infinity,
+                            level: 1
+                        })
+                    });
+                    
+                    // Override platform
+                    Object.defineProperty(navigator, 'platform', {
+                        get: () => 'MacIntel'
+                    });
+                    
+                    // Override hardwareConcurrency
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {
+                        get: () => 8
+                    });
+                    
+                    // Override deviceMemory
+                    Object.defineProperty(navigator, 'deviceMemory', {
+                        get: () => 8
                     });
                 """)
                 
@@ -180,21 +226,32 @@ class BrowserPool:
                     page = await context.new_page()
                     
                     try:
-                        # Navigate to page
+                        # Add random delay before navigation (1-3 seconds)
+                        await asyncio.sleep(random.uniform(1, 3))
+                        
+                        # Navigate to page with networkidle for better stealth
                         await page.goto(
                             url,
-                            wait_until=wait_until,
+                            wait_until='networkidle',
                             timeout=timeout
                         )
                         
                         # Wait a bit for dynamic content
-                        await page.wait_for_timeout(2000)
+                        await page.wait_for_timeout(random.uniform(2000, 4000))
                         
-                        # Scroll to trigger lazy loading
+                        # Human-like scrolling
+                        await page.evaluate("""
+                            window.scrollTo(0, document.body.scrollHeight / 3);
+                        """)
+                        await page.wait_for_timeout(random.uniform(500, 1500))
                         await page.evaluate("""
                             window.scrollTo(0, document.body.scrollHeight / 2);
                         """)
-                        await page.wait_for_timeout(1000)
+                        await page.wait_for_timeout(random.uniform(500, 1500))
+                        await page.evaluate("""
+                            window.scrollTo(0, document.body.scrollHeight);
+                        """)
+                        await page.wait_for_timeout(random.uniform(1000, 2000))
                         
                         # Get page content
                         html = await page.content()

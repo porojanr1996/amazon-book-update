@@ -168,7 +168,7 @@ class BrowserPool:
                     Object.defineProperty(navigator, 'deviceMemory', {
                         get: () => 8
                     });
-                """)
+                    """)
                     
                     self.browsers.append(browser)
                     self.contexts.append(context)

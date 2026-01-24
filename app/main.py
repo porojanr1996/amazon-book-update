@@ -94,11 +94,16 @@ async def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     import config
+    import os
+    
+    # Get root_path from environment variable (for subpath deployment)
+    root_path = os.getenv('ROOT_PATH', '')
     
     uvicorn.run(
         "app.main:app",
         host=config.FLASK_HOST,
         port=config.FLASK_PORT,
-        reload=(config.FLASK_ENV == 'development')
+        reload=(config.FLASK_ENV == 'development'),
+        root_path=root_path
     )
 

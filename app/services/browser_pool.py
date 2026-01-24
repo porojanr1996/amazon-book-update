@@ -46,17 +46,45 @@ class BrowserPool:
         self.context_lock = Lock()
         self._initialized = False
         self._cleanup_lock = Lock()
+        self._init_lock = None  # Will be created as async lock when needed
+        self._initializing = False
         
     async def initialize(self):
-        """Initialize browser pool"""
-        if self._initialized:
-            return
+        """Initialize browser pool (thread-safe)"""
+        # Use async lock to prevent concurrent initialization
+        if self._init_lock is None:
+            try:
+                self._init_lock = asyncio.Lock()
+            except RuntimeError:
+                # No event loop in this thread, create one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                self._init_lock = asyncio.Lock()
         
-        try:
-            self.playwright = await async_playwright().start()
+        async with self._init_lock:
+            if self._initialized:
+                return
             
-            # Create browsers
-            for i in range(self.pool_size):
+            if self._initializing:
+                # Wait for other thread to finish initialization
+                while self._initializing:
+                    await asyncio.sleep(0.1)
+                if self._initialized:
+                    return
+            
+            self._initializing = True
+            
+            try:
+                # Ensure we're using the current event loop
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = asyncio.get_event_loop()
+                
+                self.playwright = await async_playwright().start()
+                
+                # Create browsers sequentially to avoid event loop conflicts
+                for i in range(self.pool_size):
                 browser = await self.playwright.chromium.launch(
                     headless=self.headless,
                     args=[
@@ -142,17 +170,19 @@ class BrowserPool:
                     });
                 """)
                 
-                self.browsers.append(browser)
-                self.contexts.append(context)
-                logger.info(f"Initialized browser {i+1}/{self.pool_size}")
+                    self.browsers.append(browser)
+                    self.contexts.append(context)
+                    logger.info(f"Initialized browser {i+1}/{self.pool_size}")
+                
+                self._initialized = True
+                self._initializing = False
+                logger.info(f"Browser pool initialized with {self.pool_size} browsers")
             
-            self._initialized = True
-            logger.info(f"Browser pool initialized with {self.pool_size} browsers")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize browser pool: {e}", exc_info=True)
-            await self.cleanup()
-            raise
+            except Exception as e:
+                self._initializing = False
+                logger.error(f"Failed to initialize browser pool: {e}", exc_info=True)
+                await self.cleanup()
+                raise
     
     @asynccontextmanager
     async def get_context(self):

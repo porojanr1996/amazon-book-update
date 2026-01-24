@@ -5,6 +5,7 @@ Manages a pool of reusable browser contexts for efficient scraping
 import logging
 import asyncio
 import random
+import re
 from typing import Optional, List
 from contextlib import asynccontextmanager
 from threading import Lock

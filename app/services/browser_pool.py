@@ -83,17 +83,54 @@ class BrowserPool:
                 
                 self.playwright = await async_playwright().start()
                 
+                # Configure proxy if available
+                proxy_config = None
+                try:
+                    import config
+                    if config.AMAZON_USE_PROXY and config.AMAZON_PROXY:
+                        # Parse proxy URL
+                        proxy_url = config.AMAZON_PROXY
+                        if proxy_url.startswith('http://') or proxy_url.startswith('https://'):
+                            # Extract user:pass@host:port if present
+                            if '@' in proxy_url:
+                                auth_part, server_part = proxy_url.split('@')
+                                if '://' in auth_part:
+                                    protocol = auth_part.split('://')[0] + '://'
+                                    auth = auth_part.split('://')[1]
+                                    if ':' in auth:
+                                        username, password = auth.split(':', 1)
+                                        proxy_config = {
+                                            'server': protocol + server_part,
+                                            'username': username,
+                                            'password': password
+                                        }
+                                    else:
+                                        proxy_config = {'server': proxy_url}
+                                else:
+                                    proxy_config = {'server': proxy_url}
+                            else:
+                                proxy_config = {'server': proxy_url}
+                        logger.info(f"Using proxy for Playwright: {proxy_config.get('server', 'N/A')}")
+                except Exception as e:
+                    logger.debug(f"Could not configure proxy: {e}")
+                
                 # Create browsers sequentially to avoid event loop conflicts
                 for i in range(self.pool_size):
-                    browser = await self.playwright.chromium.launch(
-                        headless=self.headless,
-                        args=[
+                    launch_options = {
+                        'headless': self.headless,
+                        'args': [
                             '--no-sandbox',
                             '--disable-dev-shm-usage',
                             '--disable-blink-features=AutomationControlled',
                             '--disable-web-security',
                         ]
-                    )
+                    }
+                    
+                    # Add proxy if configured
+                    if proxy_config:
+                        launch_options['proxy'] = proxy_config
+                    
+                    browser = await self.playwright.chromium.launch(**launch_options)
                     
                     # Create context with realistic settings
                     context = await browser.new_context(

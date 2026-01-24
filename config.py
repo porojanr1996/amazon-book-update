@@ -26,6 +26,10 @@ AMAZON_MAX_WORKERS = int(os.getenv('AMAZON_MAX_WORKERS', '1'))  # Reduced to 1 w
 AMAZON_PLAYWRIGHT_DELAY = float(os.getenv('AMAZON_PLAYWRIGHT_DELAY', '30'))  # Delay before using Playwright (seconds)
 AMAZON_SKIP_BLOCKED = os.getenv('AMAZON_SKIP_BLOCKED', 'true').lower() == 'true'  # Skip blocked books and continue
 
+# Proxy Configuration (for EC2 when Amazon blocks IP)
+AMAZON_PROXY = os.getenv('AMAZON_PROXY', '')  # Format: http://user:pass@host:port or http://host:port
+AMAZON_USE_PROXY = os.getenv('AMAZON_USE_PROXY', 'false').lower() == 'true'  # Enable proxy for Amazon requests
+
 # Redis/Celery Configuration
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)

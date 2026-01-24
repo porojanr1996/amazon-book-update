@@ -34,6 +34,18 @@ class AmazonScraper:
         self.ua = UserAgent()
         self.session = requests.Session()
         
+        # Configure proxy if available
+        try:
+            import config
+            if config.AMAZON_USE_PROXY and config.AMAZON_PROXY:
+                self.session.proxies = {
+                    'http': config.AMAZON_PROXY,
+                    'https': config.AMAZON_PROXY
+                }
+                logger.info(f"Using proxy for Amazon requests: {config.AMAZON_PROXY.split('@')[-1] if '@' in config.AMAZON_PROXY else config.AMAZON_PROXY}")
+        except:
+            pass
+        
     def _get_headers(self) -> Dict[str, str]:
         """Generate realistic headers for Amazon requests"""
         # Use a fixed, realistic User-Agent instead of random to avoid detection

@@ -22,6 +22,8 @@ def extract_failed_books_from_logs(log_file_path="app.log", max_lines=10000):
     failed_books = {}  # {worksheet: [urls]}
     current_worksheet = None
     current_book_url = None
+    # Dicționar pentru a ține minte ultimul URL văzut pentru fiecare worksheet
+    last_urls = {}  # {worksheet: last_url}
     
     print("📋 Analizare log-uri pentru cărți eșuate...")
     print()
@@ -31,20 +33,43 @@ def extract_failed_books_from_logs(log_file_path="app.log", max_lines=10000):
             # Citește ultimele max_lines linii
             lines = f.readlines()[-max_lines:]
             
+            # Parcurge log-urile în ordine inversă pentru a găsi mai întâi worksheet-ul, apoi cărțile
+            # Construim un dicționar temporar cu contextul pentru fiecare linie
+            context_stack = []  # Stack pentru a ține minte contextul (worksheet, carte)
+            
             for line in lines:
-                # Identifică worksheet-ul curent - caută pattern-uri mai specifice
-                # Pattern 1: "Procesare: Worksheet Name"
-                worksheet_match = re.search(r'\[(\d+)/(\d+)\]\s*Procesare:\s*(.+?)$', line)
+                # Identifică worksheet-ul curent - pattern-uri specifice din update_bsr.py
+                # Pattern 1: "📚 [1/2] Procesare: Worksheet Name"
+                worksheet_match = re.search(r'📚\s*\[(\d+)/(\d+)\]\s*Procesare:\s*(.+?)$', line)
                 if not worksheet_match:
-                    # Pattern 2: "📚 [1/2] Procesare: Worksheet Name"
-                    worksheet_match = re.search(r'📚\s*\[(\d+)/(\d+)\]\s*Procesare:\s*(.+?)$', line)
-                if not worksheet_match:
-                    # Pattern 3: "📚 Worksheet Name" (înainte de procesare)
+                    # Pattern 2: "📚 [1/2] Worksheet Name" (fără "Procesare:")
                     worksheet_match = re.search(r'📚\s*\[(\d+)/(\d+)\]\s*(.+?)$', line)
+                if not worksheet_match:
+                    # Pattern 3: "Procesare: Worksheet Name" (fără emoji)
+                    worksheet_match = re.search(r'Procesare:\s*(.+?)$', line)
+                
                 if worksheet_match:
-                    current_worksheet = worksheet_match.group(3 if worksheet_match.lastindex >= 3 else 2).strip()
+                    # Extrage numele worksheet-ului
+                    if worksheet_match.lastindex >= 3:
+                        current_worksheet = worksheet_match.group(3).strip()
+                    elif worksheet_match.lastindex >= 1:
+                        current_worksheet = worksheet_match.group(1).strip()
+                    else:
+                        continue
+                    
                     if current_worksheet not in failed_books:
                         failed_books[current_worksheet] = []
+                    # Resetăm URL-ul curent când găsim un nou worksheet
+                    current_book_url = None
+                    last_urls[current_worksheet] = None
+                    continue
+                
+                # Identifică începutul unei cărți - pattern: "📖 [1/32] Book Name"
+                book_start_match = re.search(r'📖\s*\[(\d+)/(\d+)\]\s*(.+?)$', line)
+                if book_start_match:
+                    # Resetăm URL-ul când găsim o carte nouă
+                    current_book_url = None
+                    continue
                 
                 # Identifică URL-ul cărții curente - mai multe pattern-uri
                 url_match = re.search(r'🔗\s*URL:\s*(https?://[^\s]+)', line)
@@ -53,17 +78,21 @@ def extract_failed_books_from_logs(log_file_path="app.log", max_lines=10000):
                 if not url_match:
                     # Caută în linii cu "Amazon URL:"
                     url_match = re.search(r'Amazon\s+URL:\s*(https?://[^\s]+)', line, re.IGNORECASE)
+                
                 if url_match:
                     current_book_url = url_match.group(1).strip()
+                    # Normalizează URL-ul (elimină query params și trailing slash pentru comparație)
+                    current_book_url = re.sub(r'[?&].*$', '', current_book_url).rstrip('/')
+                    # Salvează ultimul URL pentru worksheet-ul curent
+                    if current_worksheet:
+                        last_urls[current_worksheet] = current_book_url
+                    continue
                 
                 # Identifică eșecuri - mai multe pattern-uri
                 failure_patterns = [
                     r'❌\s*Nu\s+s-a\s+putut\s+extrage\s+BSR',
-                    r'Failed\s+to\s+scrape\s+BSR',
-                    r'BSR\s+not\s+found',
-                    r'Request\s+error',
-                    r'ERROR.*BSR',
-                    r'WARNING.*BSR\s+not\s+found'
+                    r'Failed\s+to\s+scrape\s+BSR\s+after\s+\d+\s+attempts',
+                    r'ERROR.*Failed\s+to\s+scrape\s+BSR',
                 ]
                 
                 is_failure = False
@@ -72,11 +101,15 @@ def extract_failed_books_from_logs(log_file_path="app.log", max_lines=10000):
                         is_failure = True
                         break
                 
-                if is_failure and current_worksheet and current_book_url:
-                    # Adaugă URL-ul dacă nu există deja
-                    if current_book_url not in failed_books.get(current_worksheet, []):
-                        failed_books.setdefault(current_worksheet, []).append(current_book_url)
-                        print(f"   ❌ Eșec găsit: {current_worksheet} - {current_book_url}")
+                # Dacă e eșec și avem worksheet, folosește URL-ul curent sau ultimul URL pentru worksheet
+                if is_failure and current_worksheet:
+                    # Folosește URL-ul curent sau ultimul URL salvat pentru acest worksheet
+                    url_to_use = current_book_url or last_urls.get(current_worksheet)
+                    if url_to_use:
+                        # Adaugă URL-ul dacă nu există deja
+                        if url_to_use not in failed_books.get(current_worksheet, []):
+                            failed_books.setdefault(current_worksheet, []).append(url_to_use)
+                            print(f"   ❌ Eșec găsit: {current_worksheet} - {url_to_use}")
     
     except FileNotFoundError:
         print(f"⚠️  Fișierul de log nu a fost găsit: {log_file_path}")

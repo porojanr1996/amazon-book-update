@@ -285,15 +285,62 @@ class BrowserPool:
                         
                         # Get page content
                         html = await page.content()
+                        html_lower = html.lower()
                         
-                        # Check if page is blocked (CAPTCHA, etc.)
-                        if len(html) < 10000:
-                            logger.warning(f"Page appears to be blocked (length: {len(html)} chars)")
-                            raise Exception("Page appears to be blocked")
+                        # Check for blocking indicators (more sophisticated)
+                        is_blocked = False
+                        block_reason = None
                         
-                        if 'captcha' in html.lower() and 'verify' in html.lower():
-                            logger.warning("CAPTCHA detected on page")
-                            raise Exception("CAPTCHA detected")
+                        # Check for CAPTCHA
+                        if 'captcha' in html_lower and ('verify' in html_lower or 'form' in html_lower):
+                            is_blocked = True
+                            block_reason = "CAPTCHA detected"
+                        
+                        # Check for robot check pages
+                        robot_indicators = [
+                            'robot.*check',
+                            'verify.*you.*are.*human',
+                            'sorry.*we.*just.*need.*verify',
+                            'access.*denied',
+                            'blocked.*request',
+                            'too.*many.*requests'
+                        ]
+                        for pattern in robot_indicators:
+                            import re
+                            if re.search(pattern, html_lower, re.IGNORECASE):
+                                is_blocked = True
+                                block_reason = f"Robot check detected: {pattern}"
+                                break
+                        
+                        # Check for normal page indicators
+                        normal_indicators = [
+                            'product.*details',
+                            'add.*to.*cart',
+                            'buy.*now',
+                            'amazon.*best.*seller',
+                            'customer.*reviews',
+                            'product.*information',
+                            'best sellers rank',
+                            '#.*in.*books'
+                        ]
+                        has_normal_indicators = any(
+                            re.search(pattern, html_lower, re.IGNORECASE)
+                            for pattern in normal_indicators
+                        )
+                        
+                        # Only consider blocked if page is short AND has no normal indicators
+                        if len(html) < 5000 and not has_normal_indicators and not is_blocked:
+                            is_blocked = True
+                            block_reason = f"Page too short ({len(html)} chars) and no normal indicators"
+                        
+                        # If page is very short (< 2000 chars), it's likely blocked regardless
+                        if len(html) < 2000 and not is_blocked:
+                            is_blocked = True
+                            block_reason = f"Page very short ({len(html)} chars)"
+                        
+                        if is_blocked:
+                            logger.warning(f"Page appears to be blocked: {block_reason} (length: {len(html)} chars)")
+                            raise Exception(f"Page appears to be blocked: {block_reason}")
                         
                         logger.debug(f"Successfully fetched page: {url} (attempt {attempt + 1})")
                         return html

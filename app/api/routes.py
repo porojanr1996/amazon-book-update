@@ -37,9 +37,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 # Helper function for url_for in templates (FastAPI compatible)
-def url_for_static(filename: str) -> str:
+def url_for_static(filename: str, base_path: str = "") -> str:
     """Generate URL for static files"""
-    return f"/static/{filename}"
+    return f"{base_path}/static/{filename}"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -53,9 +53,13 @@ async def index(request: Request):
         if path.startswith("/books-reporting"):
             base_path = "/books-reporting"
     
+    # Create url_for function with base_path
+    def url_for_with_base(filename: str) -> str:
+        return url_for_static(filename, base_path)
+    
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "url_for": url_for_static,
+        "url_for": url_for_with_base,
         "base_path": base_path
     })
 

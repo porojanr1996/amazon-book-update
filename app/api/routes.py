@@ -38,7 +38,11 @@ templates = Jinja2Templates(directory="templates")
 
 # Helper function for url_for in templates (FastAPI compatible)
 def url_for_static(filename: str, base_path: str = "") -> str:
-    """Generate URL for static files"""
+    """Generate URL for static files
+    filename can be like 'css/style.css' or 'js/app.js'
+    """
+    # Remove leading slash if present
+    filename = filename.lstrip('/')
     return f"{base_path}/static/{filename}"
 
 

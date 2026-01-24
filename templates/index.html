@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amazon Best Sellers</title>
-    <link rel="stylesheet" href="{{ url_for('css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('css/style.css') if url_for else '/books-reporting/static/css/style.css' }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
@@ -79,7 +79,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('js/app.js') }}"></script>
+    <script src="{{ url_for('js/app.js') if url_for else '/books-reporting/static/js/app.js' }}"></script>
 </body>
 </html>
 

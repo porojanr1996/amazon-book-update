@@ -130,6 +130,17 @@ class AmazonScraper:
                                 logger.info(f"✅ Extracted BSR using fallback: #{bsr_value:,}")
                                 return bsr_value
                 
+                # If all methods failed, try alternative scraping method
+                logger.info("Trying alternative scraping method...")
+                try:
+                    from app.services.alternative_scraper import extract_bsr_via_alternative_method
+                    bsr = extract_bsr_via_alternative_method(clean_url)
+                    if bsr:
+                        logger.info(f"✅ Extracted BSR using alternative method: #{bsr:,}")
+                        return bsr
+                except Exception as e:
+                    logger.debug(f"Alternative method failed: {e}")
+                
                 logger.warning(f"BSR not found on page: {clean_url}")
                 return None
                 

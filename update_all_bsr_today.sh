@@ -13,7 +13,7 @@ fi
 
 # Rulează update-ul pentru toate worksheet-urile
 echo "📚 Rulează update BSR pentru toate worksheet-urile..."
-python3 update_bsr.py --all
+echo "da" | python3 update_bsr.py --all
 
 echo ""
 echo "✅ Actualizare completă!"

@@ -135,19 +135,29 @@ class BrowserPool:
                     
                     # Create context with realistic settings
                     context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    locale='en-US',
-                    timezone_id='America/New_York',
-                    permissions=['geolocation'],
-                    extra_http_headers={
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept-Encoding': 'gzip, deflate, br',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                        'Connection': 'keep-alive',
-                        'Upgrade-Insecure-Requests': '1',
-                    }
-                )
+                        viewport={'width': 1920, 'height': 1080},
+                        user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        locale='en-US',
+                        timezone_id='America/New_York',
+                        permissions=['geolocation'],
+                        # Disable automation indicators
+                        ignore_https_errors=False,
+                        java_script_enabled=True,
+                        bypass_csp=True,
+                        extra_http_headers={
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            'Accept-Encoding': 'gzip, deflate, br',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                            'Connection': 'keep-alive',
+                            'Upgrade-Insecure-Requests': '1',
+                            'Sec-Fetch-Dest': 'document',
+                            'Sec-Fetch-Mode': 'navigate',
+                            'Sec-Fetch-Site': 'none',
+                            'Sec-Fetch-User': '?1',
+                            'Cache-Control': 'max-age=0',
+                            'DNT': '1',
+                        }
+                    )
                 
                 # Add comprehensive stealth scripts to avoid detection
                 await context.add_init_script("""
@@ -155,6 +165,9 @@ class BrowserPool:
                     Object.defineProperty(navigator, 'webdriver', {
                         get: () => undefined
                     });
+                    
+                    // Remove automation indicators
+                    delete navigator.__proto__.webdriver;
                     
                     // Add chrome object
                     window.chrome = { 
@@ -206,6 +219,42 @@ class BrowserPool:
                     Object.defineProperty(navigator, 'deviceMemory', {
                         get: () => 8
                     });
+                    
+                    // Override vendor
+                    Object.defineProperty(navigator, 'vendor', {
+                        get: () => 'Google Inc.'
+                    });
+                    
+                    // Override connection
+                    Object.defineProperty(navigator, 'connection', {
+                        get: () => ({
+                            effectiveType: '4g',
+                            rtt: 50,
+                            downlink: 10,
+                            saveData: false
+                        })
+                    });
+                    
+                    // Override canvas fingerprinting
+                    const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                    HTMLCanvasElement.prototype.toDataURL = function(type) {
+                        if (type === 'image/png' || type === 'image/jpeg') {
+                            return originalToDataURL.apply(this, arguments);
+                        }
+                        return originalToDataURL.apply(this, arguments);
+                    };
+                    
+                    // Override WebGL fingerprinting
+                    const getParameter = WebGLRenderingContext.prototype.getParameter;
+                    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                        if (parameter === 37445) {
+                            return 'Intel Inc.';
+                        }
+                        if (parameter === 37446) {
+                            return 'Intel Iris OpenGL Engine';
+                        }
+                        return getParameter.apply(this, arguments);
+                    };
                     """)
                 
                 self.browsers.append(browser)
@@ -347,7 +396,7 @@ class BrowserPool:
                             from app.utils.bsr_parser import parse_bsr
                             bsr_value = parse_bsr(html)
                             if bsr_value:
-                                logger.info(f"✅ BSR found in HTML despite potential blocking: #{bsr_value:,}")
+                                logger.info(f"✅ BSR found in HTML: #{bsr_value:,}")
                                 bsr_found = True
                                 # Return HTML anyway - BSR parser will extract it
                         except Exception as e:
@@ -357,43 +406,72 @@ class BrowserPool:
                         is_blocked = False
                         block_reason = None
                         
-                        # Check for CAPTCHA
-                        has_captcha = 'captcha' in html_lower and ('verify' in html_lower or 'form' in html_lower)
+                        # More precise CAPTCHA detection - look for actual CAPTCHA pages, not just mentions
+                        # CAPTCHA pages usually have specific patterns
+                        captcha_indicators = [
+                            r'captcha.*form',
+                            r'enter.*characters.*you.*see',
+                            r'type.*characters.*below',
+                            r'amazon.*robot.*check',
+                            r'verify.*you.*are.*human',
+                            r'sorry.*we.*just.*need.*verify'
+                        ]
+                        has_captcha_page = any(
+                            re.search(pattern, html_lower, re.IGNORECASE)
+                            for pattern in captcha_indicators
+                        )
                         
-                        # Check for normal page indicators
+                        # Check for normal page indicators (more comprehensive)
                         normal_indicators = [
-                            'product.*details',
-                            'add.*to.*cart',
-                            'buy.*now',
-                            'amazon.*best.*seller',
-                            'customer.*reviews',
-                            'product.*information',
-                            'best sellers rank',
-                            '#.*in.*books',
-                            'salesrank',
-                            'kindle.*store'
+                            r'product.*details',
+                            r'add.*to.*cart',
+                            r'buy.*now',
+                            r'amazon.*best.*seller',
+                            r'customer.*reviews',
+                            r'product.*information',
+                            r'best sellers rank',
+                            r'#.*in.*books',
+                            r'salesrank',
+                            r'kindle.*store',
+                            r'product.*title',
+                            r'by.*author',
+                            r'price.*\$',
+                            r'product.*description',
+                            r'asin',
+                            r'isbn'
                         ]
                         has_normal_indicators = any(
                             re.search(pattern, html_lower, re.IGNORECASE)
                             for pattern in normal_indicators
                         )
                         
-                        # If BSR was found, don't block even if CAPTCHA is present
+                        # Count normal indicators to be more lenient
+                        normal_count = sum(
+                            1 for pattern in normal_indicators
+                            if re.search(pattern, html_lower, re.IGNORECASE)
+                        )
+                        
+                        # If BSR was found, always return HTML (even with CAPTCHA)
                         if bsr_found:
-                            logger.info("BSR found in HTML, proceeding despite potential CAPTCHA")
+                            logger.info("BSR found - returning HTML despite potential CAPTCHA")
                             # Don't raise exception - return HTML so BSR can be extracted
-                        elif has_captcha and not has_normal_indicators:
-                            # Only block if CAPTCHA AND no normal indicators AND no BSR found
+                        elif has_captcha_page and normal_count < 3 and len(html) < 10000:
+                            # Only block if it's clearly a CAPTCHA page with minimal content
+                            # Pages with 5000+ chars and some normal indicators might still have BSR
                             is_blocked = True
-                            block_reason = "CAPTCHA detected and no normal page content"
-                        elif len(html) < 2000:
-                            # Very short pages are likely blocked
+                            block_reason = f"CAPTCHA page detected (normal indicators: {normal_count}, length: {len(html)})"
+                        elif len(html) < 1500:
+                            # Very short pages are likely blocked (but allow if BSR found)
                             is_blocked = True
                             block_reason = f"Page very short ({len(html)} chars)"
                         
                         if is_blocked and not bsr_found:
-                            logger.warning(f"Page appears to be blocked: {block_reason} (length: {len(html)} chars)")
+                            logger.warning(f"Page appears to be blocked: {block_reason}")
                             raise Exception(f"Page appears to be blocked: {block_reason}")
+                        elif has_captcha_page and bsr_found:
+                            logger.info(f"CAPTCHA detected but BSR found - proceeding with extraction")
+                        elif has_captcha_page and normal_count >= 3:
+                            logger.info(f"CAPTCHA detected but page has {normal_count} normal indicators - proceeding")
                         
                         logger.debug(f"Successfully fetched page: {url} (attempt {attempt + 1})")
                         return html

@@ -86,17 +86,17 @@ class BrowserPool:
                 # Create browsers sequentially to avoid event loop conflicts
                 for i in range(self.pool_size):
                     browser = await self.playwright.chromium.launch(
-                    headless=self.headless,
-                    args=[
-                        '--no-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-blink-features=AutomationControlled',
-                        '--disable-web-security',
-                    ]
-                )
-                
-                # Create context with realistic settings
-                context = await browser.new_context(
+                        headless=self.headless,
+                        args=[
+                            '--no-sandbox',
+                            '--disable-dev-shm-usage',
+                            '--disable-blink-features=AutomationControlled',
+                            '--disable-web-security',
+                        ]
+                    )
+                    
+                    # Create context with realistic settings
+                    context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
                     user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     locale='en-US',

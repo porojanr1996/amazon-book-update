@@ -19,9 +19,9 @@ echo "da" | python3 update_bsr.py --all
 sleep 5
 
 echo ""
-echo "=" * 60
+echo "============================================================"
 echo "🔍 Verificare cărți eșuate și retry..."
-echo "=" * 60
+echo "============================================================"
 echo ""
 
 # Rulează retry pentru cărțile eșuate

@@ -768,7 +768,7 @@ async function loadRankings() {
         const cacheBuster = `_=${Date.now()}`;
         // Build URL correctly: combine all parameters
         const params = [worksheetParam, cacheBuster].join('&');
-        const url = `/api/rankings?${params}`;
+        const url = getApiPath(`/api/rankings?${params}`);
         console.log('📚 Fetching rankings from:', url);
         console.log('📂 Current worksheet:', worksheetName);
         

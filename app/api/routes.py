@@ -51,7 +51,12 @@ async def index(request: Request):
     """Main dashboard page"""
     # Get base path from X-Script-Name header or request path
     base_path = request.headers.get("X-Script-Name", "")
-    if not base_path:
+    
+    # Check if accessed via subdomain (books-reporting.novamediamarketing.net)
+    host = request.headers.get("Host", "")
+    if "books-reporting.novamediamarketing.net" in host:
+        base_path = ""  # No prefix needed for subdomain
+    elif not base_path:
         # Try to extract from request path
         path = str(request.url.path)
         if path.startswith("/books-reporting"):

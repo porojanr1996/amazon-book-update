@@ -455,15 +455,22 @@ class BrowserPool:
                         if bsr_found:
                             logger.info("BSR found - returning HTML despite potential CAPTCHA")
                             # Don't raise exception - return HTML so BSR can be extracted
-                        elif has_captcha_page and normal_count < 3 and len(html) < 10000:
-                            # Only block if it's clearly a CAPTCHA page with minimal content
-                            # Pages with 5000+ chars and some normal indicators might still have BSR
+                        # Be more permissive: if page has substantial content (5000+ chars), allow extraction
+                        # even with CAPTCHA - BSR might be in HTML in a different format
+                        elif has_captcha_page and normal_count < 3 and len(html) < 5000:
+                            # Only block if it's clearly a CAPTCHA page with minimal content (< 5000 chars)
+                            # Pages with 5000+ chars might still have BSR even with CAPTCHA
                             is_blocked = True
                             block_reason = f"CAPTCHA page detected (normal indicators: {normal_count}, length: {len(html)})"
                         elif len(html) < 1500:
                             # Very short pages are likely blocked (but allow if BSR found)
                             is_blocked = True
                             block_reason = f"Page very short ({len(html)} chars)"
+                        elif has_captcha_page and len(html) >= 5000:
+                            # Page has substantial content (5000+ chars) - allow extraction even with CAPTCHA
+                            # BSR might be present in HTML in a format parser doesn't recognize yet
+                            logger.info(f"CAPTCHA detected but page has {len(html)} chars - allowing extraction (normal indicators: {normal_count})")
+                            # Don't block - return HTML for BSR extraction
                         
                         if is_blocked and not bsr_found:
                             logger.warning(f"Page appears to be blocked: {block_reason}")
@@ -472,6 +479,8 @@ class BrowserPool:
                             logger.info(f"CAPTCHA detected but BSR found - proceeding with extraction")
                         elif has_captcha_page and normal_count >= 3:
                             logger.info(f"CAPTCHA detected but page has {normal_count} normal indicators - proceeding")
+                        elif has_captcha_page and len(html) >= 5000:
+                            logger.info(f"CAPTCHA detected but page has {len(html)} chars - allowing extraction attempt")
                         
                         logger.debug(f"Successfully fetched page: {url} (attempt {attempt + 1})")
                         return html

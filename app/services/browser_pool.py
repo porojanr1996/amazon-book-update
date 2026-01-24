@@ -276,8 +276,12 @@ class BrowserPool:
                         # Human-like scrolling with mouse movements
                         scroll_positions = [0.2, 0.4, 0.6, 0.8, 1.0]
                         for pos in scroll_positions:
-                            # Scroll gradually
-                            scroll_y = int(document.body.scrollHeight * pos)
+                            # Scroll gradually - get scroll height first, then scroll
+                            scroll_y = await page.evaluate(f"""
+                                () => {{
+                                    return Math.floor(document.body.scrollHeight * {pos});
+                                }}
+                            """)
                             await page.evaluate(f"""
                                 window.scrollTo({{
                                     top: {scroll_y},

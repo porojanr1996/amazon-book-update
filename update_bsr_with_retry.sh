@@ -6,6 +6,10 @@ echo ""
 
 cd /home/ec2-user/app/books-reporting || exit 1
 
+# Setează variabilele de mediu pentru credentials
+export GOOGLE_SHEETS_CREDENTIALS_PATH=/home/ec2-user/app/books-reporting/credentials.json
+export GOOGLE_SHEETS_SPREADSHEET_ID=1-y5ly84oAV1GkhpLlD3MfvLZSi-5UThypHXsmch6RiA
+
 # Activează environment-ul dacă există
 if [ -d "venv" ]; then
     source venv/bin/activate

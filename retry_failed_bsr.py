@@ -5,6 +5,7 @@ Script pentru a identifica cărțile care au eșuat la update BSR din log-uri
 """
 import re
 import sys
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -31,25 +32,51 @@ def extract_failed_books_from_logs(log_file_path="app.log", max_lines=10000):
             lines = f.readlines()[-max_lines:]
             
             for line in lines:
-                # Identifică worksheet-ul curent
-                worksheet_match = re.search(r'Procesare:\s*(.+?)$', line)
+                # Identifică worksheet-ul curent - caută pattern-uri mai specifice
+                # Pattern 1: "Procesare: Worksheet Name"
+                worksheet_match = re.search(r'\[(\d+)/(\d+)\]\s*Procesare:\s*(.+?)$', line)
+                if not worksheet_match:
+                    # Pattern 2: "📚 [1/2] Procesare: Worksheet Name"
+                    worksheet_match = re.search(r'📚\s*\[(\d+)/(\d+)\]\s*Procesare:\s*(.+?)$', line)
+                if not worksheet_match:
+                    # Pattern 3: "📚 Worksheet Name" (înainte de procesare)
+                    worksheet_match = re.search(r'📚\s*\[(\d+)/(\d+)\]\s*(.+?)$', line)
                 if worksheet_match:
-                    current_worksheet = worksheet_match.group(1).strip()
+                    current_worksheet = worksheet_match.group(3 if worksheet_match.lastindex >= 3 else 2).strip()
                     if current_worksheet not in failed_books:
                         failed_books[current_worksheet] = []
                 
-                # Identifică URL-ul cărții curente
-                url_match = re.search(r'URL:\s*(https?://[^\s]+)', line)
+                # Identifică URL-ul cărții curente - mai multe pattern-uri
+                url_match = re.search(r'🔗\s*URL:\s*(https?://[^\s]+)', line)
+                if not url_match:
+                    url_match = re.search(r'URL:\s*(https?://[^\s]+)', line)
+                if not url_match:
+                    # Caută în linii cu "Amazon URL:"
+                    url_match = re.search(r'Amazon\s+URL:\s*(https?://[^\s]+)', line, re.IGNORECASE)
                 if url_match:
                     current_book_url = url_match.group(1).strip()
                 
-                # Identifică eșecuri
-                if re.search(r'❌ Nu s-a putut extrage BSR|Failed to scrape BSR|BSR not found|Request error', line, re.IGNORECASE):
-                    if current_worksheet and current_book_url:
-                        # Adaugă URL-ul dacă nu există deja
-                        if current_book_url not in failed_books.get(current_worksheet, []):
-                            failed_books.setdefault(current_worksheet, []).append(current_book_url)
-                            print(f"   ❌ Eșec găsit: {current_worksheet} - {current_book_url}")
+                # Identifică eșecuri - mai multe pattern-uri
+                failure_patterns = [
+                    r'❌\s*Nu\s+s-a\s+putut\s+extrage\s+BSR',
+                    r'Failed\s+to\s+scrape\s+BSR',
+                    r'BSR\s+not\s+found',
+                    r'Request\s+error',
+                    r'ERROR.*BSR',
+                    r'WARNING.*BSR\s+not\s+found'
+                ]
+                
+                is_failure = False
+                for pattern in failure_patterns:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        is_failure = True
+                        break
+                
+                if is_failure and current_worksheet and current_book_url:
+                    # Adaugă URL-ul dacă nu există deja
+                    if current_book_url not in failed_books.get(current_worksheet, []):
+                        failed_books.setdefault(current_worksheet, []).append(current_book_url)
+                        print(f"   ❌ Eșec găsit: {current_worksheet} - {current_book_url}")
     
     except FileNotFoundError:
         print(f"⚠️  Fișierul de log nu a fost găsit: {log_file_path}")
@@ -102,8 +129,20 @@ def retry_failed_books(failed_books_dict, dry_run=False):
     # Conectare la Google Sheets
     print("📋 Conectare la Google Sheets...")
     try:
+        # Folosește calea absolută dacă nu este setată variabila de mediu
+        creds_path = config.GOOGLE_SHEETS_CREDENTIALS_PATH
+        if not os.path.isabs(creds_path) and not os.path.exists(creds_path):
+            # Încearcă calea relativă la directorul curent
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            creds_path_abs = os.path.join(script_dir, creds_path)
+            if os.path.exists(creds_path_abs):
+                creds_path = creds_path_abs
+            else:
+                # Fallback: calea standard pe EC2
+                creds_path = '/home/ec2-user/app/books-reporting/credentials.json'
+        
         sheets_manager = GoogleSheetsManager(
-            config.GOOGLE_SHEETS_CREDENTIALS_PATH,
+            creds_path,
             config.GOOGLE_SHEETS_SPREADSHEET_ID
         )
         print("✅ Conectat cu succes")

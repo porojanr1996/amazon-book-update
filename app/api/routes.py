@@ -45,9 +45,18 @@ def url_for_static(filename: str) -> str:
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Main dashboard page"""
+    # Get base path from X-Script-Name header or request path
+    base_path = request.headers.get("X-Script-Name", "")
+    if not base_path:
+        # Try to extract from request path
+        path = str(request.url.path)
+        if path.startswith("/books-reporting"):
+            base_path = "/books-reporting"
+    
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "url_for": url_for_static
+        "url_for": url_for_static,
+        "base_path": base_path
     })
 
 

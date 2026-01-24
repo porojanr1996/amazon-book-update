@@ -26,6 +26,11 @@
             console.error('❌ Chart.js not loaded!');
         }
     </script>
+    <script>
+        // Set base path for API calls and static files
+        window.BASE_PATH = '{{ base_path or "" }}';
+        console.log('📍 Base path set to:', window.BASE_PATH);
+    </script>
 </head>
 <body>
     <div class="container">

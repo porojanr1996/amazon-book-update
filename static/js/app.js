@@ -56,11 +56,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// Helper function to get API path
+function getApiPath(path) {
+    const basePath = window.BASE_PATH || '';
+    return basePath + path;
+}
+
 // Initialize worksheet filters sidebar
 async function initializeWorksheets() {
     console.log('📂 initializeWorksheets() called');
     try {
-        const response = await fetch('/api/worksheets');
+        const response = await fetch(getApiPath('/api/worksheets'));
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -205,7 +211,7 @@ async function loadChart() {
         const cacheBuster = `_=${Date.now()}`;
         // Build URL correctly: combine all parameters
         const params = [rangeParam, worksheetParam, cacheBuster].filter(p => p).join('&');
-        const url = `/api/chart-data?${params}`;
+        const url = getApiPath(`/api/chart-data?${params}`);
         console.log('🌐 FETCHING FROM URL:', url);
         console.log('📅 Current time range:', currentTimeRange);
         console.log('📂 Current worksheet:', currentWorksheet);
@@ -840,13 +846,14 @@ function createRankingCard(book, rank) {
     card.className = 'ranking-card';
     
     // Use cover image from backend if available, otherwise use placeholder
-    const coverImage = book.cover_image || '/static/images/placeholder-book.svg';
+    const basePath = window.BASE_PATH || '';
+    const coverImage = book.cover_image || basePath + '/static/images/placeholder-book.svg';
     
     card.innerHTML = `
         <div class="rank-badge">#${rank}</div>
         <div class="book-cover-container">
             <img src="${coverImage}" alt="${escapeHtml(book.name)}" class="book-cover" 
-                 onerror="this.onerror=null; this.src='/static/images/placeholder-book.svg';">
+                 onerror="this.onerror=null; this.src='${basePath}/static/images/placeholder-book.svg';">
         </div>
         <div class="book-info">
             <div class="book-title">${escapeHtml(book.name)}</div>

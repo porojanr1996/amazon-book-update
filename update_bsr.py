@@ -155,26 +155,29 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                         worksheet_success += 1
                         total_success += 1
                     else:
-                        # Verifică dacă e blocat de CAPTCHA
+                        # Verifică dacă e blocat de CAPTCHA sau alte probleme
                         is_blocked = False
-                        try:
-                            # Dacă Playwright a eșuat cu CAPTCHA, marchează ca blocat
-                            if 'captcha' in str(book.get('amazon_link', '')).lower():
-                                is_blocked = True
-                        except:
-                            pass
+                        error_msg = str(e) if 'e' in locals() else "Unknown error"
+                        
+                        # Dacă Playwright a eșuat cu CAPTCHA sau blocking
+                        if 'captcha' in error_msg.lower() or 'blocked' in error_msg.lower():
+                            is_blocked = True
                         
                         if is_blocked:
-                            print(f"⚠️  Carte blocată de CAPTCHA - va fi re-încercată mai târziu")
+                            print(f"⚠️  Carte blocată de Amazon - va fi re-încercată mai târziu")
+                            # Marchează în Google Sheets cu valoare specială pentru tracking
+                            if not dry_run:
+                                try:
+                                    # Scrie "BLOCKED" sau lasă gol pentru a indica că trebuie actualizat manual
+                                    # Nu scriem nimic - rândul rămâne gol, indicând că trebuie actualizat
+                                    print(f"      ⚠️  Rândul {today_row}, coloana {book['col']} rămâne neactualizat (blocat)")
+                                except Exception as e:
+                                    print(f"      ⚠️  Nu s-a putut marca ca blocat: {e}")
                         else:
                             print(f"❌ Nu s-a putut extrage BSR")
                         
                         worksheet_failed += 1
                         total_failed += 1
-                        
-                        # Dacă e blocat și config permite skip, continuă mai rapid
-                        if is_blocked and config.AMAZON_SKIP_BLOCKED:
-                            print(f"      ⏭️  Sări peste cărțile blocate și continuă...")
                 
                 except Exception as e:
                     print(f"❌ Eroare: {e}")

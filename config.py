@@ -1,3 +1,5 @@
+
+
 import os
 from dotenv import load_dotenv
 from pytz import timezone
@@ -18,10 +20,10 @@ SCHEDULE_TIME = os.getenv('SCHEDULE_TIME', '10:00')
 SCHEDULE_TIMEZONE = timezone(os.getenv('SCHEDULE_TIMEZONE', 'Europe/Bucharest'))
 
 # Amazon Scraping Configuration
-AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '2'))
+AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '15'))  # Increased to 15s to avoid CAPTCHA
 AMAZON_RETRY_ATTEMPTS = int(os.getenv('AMAZON_RETRY_ATTEMPTS', '3'))
-AMAZON_MAX_WORKERS = int(os.getenv('AMAZON_MAX_WORKERS', '1'))
-
+AMAZON_MAX_WORKERS = int(os.getenv('AMAZON_MAX_WORKERS', '1'))  # Reduced to 1 worker to avoid rate limiting (sequential processing)
+AMAZON_PLAYWRIGHT_DELAY = float(os.getenv('AMAZON_PLAYWRIGHT_DELAY', '20'))  # Delay before using Playwright (seconds)
 
 # Redis/Celery Configuration
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -29,3 +31,4 @@ CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', REDIS_URL)
 # Redis cache uses same URL but different DB (1) to avoid conflicts with Celery
 REDIS_CACHE_URL = os.getenv('REDIS_CACHE_URL', 'redis://localhost:6379/1')
+

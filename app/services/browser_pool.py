@@ -256,8 +256,8 @@ class BrowserPool:
                     page = await context.new_page()
                     
                     try:
-                        # Add random delay before navigation (1-3 seconds)
-                        await asyncio.sleep(random.uniform(1, 3))
+                        # Add longer random delay before navigation (3-6 seconds) to avoid detection
+                        await asyncio.sleep(random.uniform(3, 6))
                         
                         # Navigate to page with networkidle for better stealth
                         await page.goto(
@@ -266,22 +266,33 @@ class BrowserPool:
                             timeout=timeout
                         )
                         
-                        # Wait a bit for dynamic content
-                        await page.wait_for_timeout(random.uniform(2000, 4000))
+                        # Wait longer for dynamic content and to appear more human-like
+                        await page.wait_for_timeout(random.uniform(3000, 6000))
                         
-                        # Human-like scrolling
-                        await page.evaluate("""
-                            window.scrollTo(0, document.body.scrollHeight / 3);
-                        """)
-                        await page.wait_for_timeout(random.uniform(500, 1500))
-                        await page.evaluate("""
-                            window.scrollTo(0, document.body.scrollHeight / 2);
-                        """)
-                        await page.wait_for_timeout(random.uniform(500, 1500))
-                        await page.evaluate("""
-                            window.scrollTo(0, document.body.scrollHeight);
-                        """)
-                        await page.wait_for_timeout(random.uniform(1000, 2000))
+                        # Simulate mouse movement (human-like behavior)
+                        await page.mouse.move(random.randint(100, 500), random.randint(100, 500))
+                        await page.wait_for_timeout(random.uniform(500, 1000))
+                        
+                        # Human-like scrolling with mouse movements
+                        scroll_positions = [0.2, 0.4, 0.6, 0.8, 1.0]
+                        for pos in scroll_positions:
+                            # Scroll gradually
+                            scroll_y = int(document.body.scrollHeight * pos)
+                            await page.evaluate(f"""
+                                window.scrollTo({{
+                                    top: {scroll_y},
+                                    behavior: 'smooth'
+                                }});
+                            """)
+                            # Random mouse movement during scroll
+                            await page.mouse.move(
+                                random.randint(200, 800),
+                                random.randint(200, 600)
+                            )
+                            await page.wait_for_timeout(random.uniform(1000, 2500))
+                        
+                        # Final wait to appear more human
+                        await page.wait_for_timeout(random.uniform(2000, 4000))
                         
                         # Get page content
                         html = await page.content()

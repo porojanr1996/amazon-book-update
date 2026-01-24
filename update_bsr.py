@@ -169,7 +169,10 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                 # Delay între request-uri (dacă nu e ultima carte)
                 if i < len(books):
                     delay = config.AMAZON_DELAY_BETWEEN_REQUESTS
-                    print(f"      ⏳ Așteptare {delay}s între request-uri...")
+                    # Dacă a eșuat, așteaptă mai mult înainte de următorul request
+                    if not bsr:
+                        delay = delay * 1.5  # 50% mai mult dacă a eșuat
+                    print(f"      ⏳ Așteptare {delay:.1f}s între request-uri...")
                     time.sleep(delay)
                     print()
             

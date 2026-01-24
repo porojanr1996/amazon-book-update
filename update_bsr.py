@@ -155,9 +155,26 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                         worksheet_success += 1
                         total_success += 1
                     else:
-                        print(f"❌ Nu s-a putut extrage BSR")
+                        # Verifică dacă e blocat de CAPTCHA
+                        is_blocked = False
+                        try:
+                            # Dacă Playwright a eșuat cu CAPTCHA, marchează ca blocat
+                            if 'captcha' in str(book.get('amazon_link', '')).lower():
+                                is_blocked = True
+                        except:
+                            pass
+                        
+                        if is_blocked:
+                            print(f"⚠️  Carte blocată de CAPTCHA - va fi re-încercată mai târziu")
+                        else:
+                            print(f"❌ Nu s-a putut extrage BSR")
+                        
                         worksheet_failed += 1
                         total_failed += 1
+                        
+                        # Dacă e blocat și config permite skip, continuă mai rapid
+                        if is_blocked and config.AMAZON_SKIP_BLOCKED:
+                            print(f"      ⏭️  Sări peste cărțile blocate și continuă...")
                 
                 except Exception as e:
                     print(f"❌ Eroare: {e}")

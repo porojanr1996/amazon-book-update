@@ -256,8 +256,8 @@ class BrowserPool:
                     page = await context.new_page()
                     
                     try:
-                        # Add longer random delay before navigation (3-6 seconds) to avoid detection
-                        await asyncio.sleep(random.uniform(3, 6))
+                        # Add longer random delay before navigation (5-10 seconds) to avoid detection
+                        await asyncio.sleep(random.uniform(5, 10))
                         
                         # Navigate to page with networkidle for better stealth
                         await page.goto(

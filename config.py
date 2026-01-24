@@ -20,10 +20,11 @@ SCHEDULE_TIME = os.getenv('SCHEDULE_TIME', '10:00')
 SCHEDULE_TIMEZONE = timezone(os.getenv('SCHEDULE_TIMEZONE', 'Europe/Bucharest'))
 
 # Amazon Scraping Configuration
-AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '15'))  # Increased to 15s to avoid CAPTCHA
+AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '25'))  # Increased to 25s to avoid CAPTCHA
 AMAZON_RETRY_ATTEMPTS = int(os.getenv('AMAZON_RETRY_ATTEMPTS', '3'))
 AMAZON_MAX_WORKERS = int(os.getenv('AMAZON_MAX_WORKERS', '1'))  # Reduced to 1 worker to avoid rate limiting (sequential processing)
-AMAZON_PLAYWRIGHT_DELAY = float(os.getenv('AMAZON_PLAYWRIGHT_DELAY', '20'))  # Delay before using Playwright (seconds)
+AMAZON_PLAYWRIGHT_DELAY = float(os.getenv('AMAZON_PLAYWRIGHT_DELAY', '30'))  # Delay before using Playwright (seconds)
+AMAZON_SKIP_BLOCKED = os.getenv('AMAZON_SKIP_BLOCKED', 'true').lower() == 'true'  # Skip blocked books and continue
 
 # Redis/Celery Configuration
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

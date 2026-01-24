@@ -302,30 +302,25 @@ class BrowserPool:
                         html = await page.content()
                         html_lower = html.lower()
                         
+                        # IMPORTANT: Try to extract BSR even if page appears blocked
+                        # Sometimes BSR is still in HTML even with CAPTCHA
+                        bsr_found = False
+                        try:
+                            from app.utils.bsr_parser import parse_bsr
+                            bsr_value = parse_bsr(html)
+                            if bsr_value:
+                                logger.info(f"✅ BSR found in HTML despite potential blocking: #{bsr_value:,}")
+                                bsr_found = True
+                                # Return HTML anyway - BSR parser will extract it
+                        except Exception as e:
+                            logger.debug(f"Could not parse BSR from HTML: {e}")
+                        
                         # Check for blocking indicators (more sophisticated)
                         is_blocked = False
                         block_reason = None
                         
                         # Check for CAPTCHA
-                        if 'captcha' in html_lower and ('verify' in html_lower or 'form' in html_lower):
-                            is_blocked = True
-                            block_reason = "CAPTCHA detected"
-                        
-                        # Check for robot check pages
-                        robot_indicators = [
-                            'robot.*check',
-                            'verify.*you.*are.*human',
-                            'sorry.*we.*just.*need.*verify',
-                            'access.*denied',
-                            'blocked.*request',
-                            'too.*many.*requests'
-                        ]
-                        for pattern in robot_indicators:
-                            import re
-                            if re.search(pattern, html_lower, re.IGNORECASE):
-                                is_blocked = True
-                                block_reason = f"Robot check detected: {pattern}"
-                                break
+                        has_captcha = 'captcha' in html_lower and ('verify' in html_lower or 'form' in html_lower)
                         
                         # Check for normal page indicators
                         normal_indicators = [
@@ -336,24 +331,29 @@ class BrowserPool:
                             'customer.*reviews',
                             'product.*information',
                             'best sellers rank',
-                            '#.*in.*books'
+                            '#.*in.*books',
+                            'salesrank',
+                            'kindle.*store'
                         ]
                         has_normal_indicators = any(
                             re.search(pattern, html_lower, re.IGNORECASE)
                             for pattern in normal_indicators
                         )
                         
-                        # Only consider blocked if page is short AND has no normal indicators
-                        if len(html) < 5000 and not has_normal_indicators and not is_blocked:
+                        # If BSR was found, don't block even if CAPTCHA is present
+                        if bsr_found:
+                            logger.info("BSR found in HTML, proceeding despite potential CAPTCHA")
+                            # Don't raise exception - return HTML so BSR can be extracted
+                        elif has_captcha and not has_normal_indicators:
+                            # Only block if CAPTCHA AND no normal indicators AND no BSR found
                             is_blocked = True
-                            block_reason = f"Page too short ({len(html)} chars) and no normal indicators"
-                        
-                        # If page is very short (< 2000 chars), it's likely blocked regardless
-                        if len(html) < 2000 and not is_blocked:
+                            block_reason = "CAPTCHA detected and no normal page content"
+                        elif len(html) < 2000:
+                            # Very short pages are likely blocked
                             is_blocked = True
                             block_reason = f"Page very short ({len(html)} chars)"
                         
-                        if is_blocked:
+                        if is_blocked and not bsr_found:
                             logger.warning(f"Page appears to be blocked: {block_reason} (length: {len(html)} chars)")
                             raise Exception(f"Page appears to be blocked: {block_reason}")
                         

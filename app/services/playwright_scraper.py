@@ -44,12 +44,34 @@ async def extract_bsr_with_playwright(amazon_url: str) -> Optional[int]:
             logger.warning("Failed to fetch page with Playwright")
             return None
         
-        # Use strict BSR parser if available
+        # Use strict BSR parser if available - try even if page might be blocked
         if STRICT_BSR_PARSER_AVAILABLE:
             bsr = strict_parse_bsr(html)
             if bsr:
-                logger.info(f"✓ BSR extracted with Playwright + strict parser: {bsr}")
+                logger.info(f"✅ BSR extracted with Playwright + strict parser: #{bsr:,}")
                 return bsr
+            # Even if parser didn't find BSR, check if page has CAPTCHA but might still have BSR
+            html_lower = html.lower()
+            if 'captcha' in html_lower:
+                logger.warning("CAPTCHA detected but attempting to extract BSR anyway...")
+                # Try more aggressive parsing
+                import re
+                # Look for BSR in raw HTML even with CAPTCHA
+                bsr_patterns = [
+                    r'#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
+                    r'Best\s+Sellers\s+Rank[:\s]*#?(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle',
+                    r'SalesRank[:\s]*#?(\d{1,3}(?:,\d{3})*)',
+                ]
+                for pattern in bsr_patterns:
+                    matches = re.findall(pattern, html, re.IGNORECASE)
+                    for match in matches:
+                        try:
+                            bsr_value = int(match.replace(',', ''))
+                            if 1 <= bsr_value < 10000000:
+                                logger.info(f"✅ BSR extracted from blocked page: #{bsr_value:,}")
+                                return bsr_value
+                        except:
+                            continue
             logger.warning("BSR not found even with Playwright + strict parser")
             return None
         

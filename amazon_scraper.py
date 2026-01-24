@@ -75,9 +75,18 @@ class AmazonScraper:
             BSR value as integer, or None if not found
         """
         # For UK domains, always use Playwright (Amazon UK blocks simple requests)
+        # For US on EC2, also use Playwright directly (Amazon US blocks EC2 IPs)
         is_uk_domain = '.co.uk' in amazon_url or 'amazon.co.uk' in amazon_url
-        if is_uk_domain:
-            logger.info(f"UK domain detected, using Playwright for {amazon_url}")
+        is_us_domain = 'amazon.com' in amazon_url and not is_uk_domain
+        
+        # Check if we're on EC2 (Amazon blocks EC2 IPs more aggressively)
+        import os
+        is_ec2 = os.path.exists('/sys/hypervisor/uuid') or os.path.exists('/var/lib/cloud/instance')
+        
+        # Use Playwright for UK always, or for US if on EC2
+        if is_uk_domain or (is_us_domain and is_ec2):
+            domain_type = "UK" if is_uk_domain else "US"
+            logger.info(f"{domain_type} domain detected on EC2, using Playwright directly for {amazon_url}")
             use_playwright = True
         
         # If Playwright is requested, use it directly

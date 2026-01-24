@@ -122,25 +122,25 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                 print(f"      🔗 URL: {book['amazon_link']}")
                 
                 try:
-                    # Pentru UK, folosește direct Playwright (Amazon UK blochează request-uri simple)
+                    # Folosește direct Playwright pentru toate domeniile (Amazon blochează request-uri simple pe EC2)
                     is_uk = '.co.uk' in book['amazon_link'] or 'amazon.co.uk' in book['amazon_link']
+                    domain_type = "UK" if is_uk else "US"
                     
-                    if is_uk:
-                        print(f"      🔍 Extragere BSR cu Playwright (UK)...", end=' ', flush=True)
-                        try:
-                            bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=True)
-                        except Exception as e:
-                            print(f"\n      ❌ Eroare Playwright: {e}")
-                            bsr = None
-                    else:
-                        # Pentru US, încearcă mai întâi cu requests
-                        print(f"      🔍 Extragere BSR...", end=' ', flush=True)
-                        bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=False)
+                    print(f"      🔍 Extragere BSR cu Playwright ({domain_type})...", end=' ', flush=True)
+                    try:
+                        bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=True)
+                    except Exception as e:
+                        print(f"\n      ❌ Eroare Playwright: {e}")
+                        bsr = None
                         
-                        # Dacă nu funcționează, încearcă cu Playwright ca fallback
+                        # Dacă Playwright eșuează, încearcă metoda simplă ca ultim fallback
                         if not bsr:
-                            print(f"\n      🔄 Încercare cu Playwright...", end=' ', flush=True)
-                            bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=True)
+                            print(f"      🔄 Încercare cu metoda simplă (fallback)...", end=' ', flush=True)
+                            try:
+                                bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=False)
+                            except Exception as e2:
+                                print(f"\n      ❌ Eroare metoda simplă: {e2}")
+                                bsr = None
                     
                     if bsr:
                         print(f"✅ BSR: #{bsr:,}")

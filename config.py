@@ -20,11 +20,15 @@ SCHEDULE_TIME = os.getenv('SCHEDULE_TIME', '10:00')
 SCHEDULE_TIMEZONE = timezone(os.getenv('SCHEDULE_TIMEZONE', 'Europe/Bucharest'))
 
 # Amazon Scraping Configuration
-AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '25'))  # Increased to 25s to avoid CAPTCHA
+AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '25'))  # Base delay
+AMAZON_DELAY_MIN = float(os.getenv('AMAZON_DELAY_MIN', '25'))  # Min delay (seconds)
+AMAZON_DELAY_MAX = float(os.getenv('AMAZON_DELAY_MAX', '75'))  # Max delay (seconds)
+AMAZON_BACKOFF_ON_500 = float(os.getenv('AMAZON_BACKOFF_ON_500', '60'))  # Additional delay on 500 error (seconds)
 AMAZON_RETRY_ATTEMPTS = int(os.getenv('AMAZON_RETRY_ATTEMPTS', '3'))
 AMAZON_MAX_WORKERS = int(os.getenv('AMAZON_MAX_WORKERS', '1'))  # Reduced to 1 worker to avoid rate limiting (sequential processing)
 AMAZON_PLAYWRIGHT_DELAY = float(os.getenv('AMAZON_PLAYWRIGHT_DELAY', '30'))  # Delay before using Playwright (seconds)
 AMAZON_SKIP_BLOCKED = os.getenv('AMAZON_SKIP_BLOCKED', 'true').lower() == 'true'  # Skip blocked books and continue
+AMAZON_SKIP_ON_CAPTCHA = os.getenv('AMAZON_SKIP_ON_CAPTCHA', 'true').lower() == 'true'  # Skip immediately on CAPTCHA (don't retry)
 
 # Proxy Configuration (for EC2 when Amazon blocks IP)
 AMAZON_PROXY = os.getenv('AMAZON_PROXY', '')  # Format: http://user:pass@host:port or http://host:port

@@ -50,6 +50,13 @@ class BrowserPool:
         self._init_lock = None  # Will be created as async lock when needed
         self._initializing = False
         
+        # Storage state path for session persistence
+        import os
+        from pathlib import Path
+        storage_dir = Path(os.getenv('PLAYWRIGHT_STORAGE_DIR', '/tmp/playwright_storage'))
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        self.storage_state_path = storage_dir / 'amazon_session.json'
+        
     async def initialize(self):
         """Initialize browser pool (thread-safe)"""
         # Use async lock to prevent concurrent initialization
@@ -133,18 +140,29 @@ class BrowserPool:
                     
                     browser = await self.playwright.chromium.launch(**launch_options)
                     
+                    # Load storage state if exists (persist session)
+                    storage_state = None
+                    if self.storage_state_path.exists():
+                        try:
+                            import json
+                            with open(self.storage_state_path, 'r') as f:
+                                storage_state = json.load(f)
+                            logger.debug("Loaded existing storage state for session persistence")
+                        except Exception as e:
+                            logger.debug(f"Could not load storage state: {e}")
+                    
                     # Create context with realistic settings
-                    context = await browser.new_context(
-                        viewport={'width': 1920, 'height': 1080},
-                        user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        locale='en-US',
-                        timezone_id='America/New_York',
-                        permissions=['geolocation'],
+                    context_options = {
+                        'viewport': {'width': 1920, 'height': 1080},
+                        'user_agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'locale': 'en-US',
+                        'timezone_id': 'America/New_York',
+                        'permissions': ['geolocation'],
                         # Disable automation indicators
-                        ignore_https_errors=False,
-                        java_script_enabled=True,
-                        bypass_csp=True,
-                        extra_http_headers={
+                        'ignore_https_errors': False,
+                        'java_script_enabled': True,
+                        'bypass_csp': True,
+                        'extra_http_headers': {
                             'Accept-Language': 'en-US,en;q=0.9',
                             'Accept-Encoding': 'gzip, deflate, br',
                             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -157,7 +175,13 @@ class BrowserPool:
                             'Cache-Control': 'max-age=0',
                             'DNT': '1',
                         }
-                    )
+                    }
+                    
+                    # Add storage state if available
+                    if storage_state:
+                        context_options['storage_state'] = storage_state
+                    
+                    context = await browser.new_context(**context_options)
                 
                 # Add comprehensive stealth scripts to avoid detection
                 await context.add_init_script("""
@@ -343,15 +367,42 @@ class BrowserPool:
                     page = await context.new_page()
                     
                     try:
-                        # Add longer random delay before navigation (5-10 seconds) to avoid detection
-                        await asyncio.sleep(random.uniform(5, 10))
+                        # Random delay before navigation (25-75 seconds) to avoid detection
+                        try:
+                            import config
+                            delay_min = config.AMAZON_DELAY_MIN
+                            delay_max = config.AMAZON_DELAY_MAX
+                        except:
+                            delay_min = 25
+                            delay_max = 75
+                        
+                        delay = random.uniform(delay_min, delay_max)
+                        logger.debug(f"Waiting {delay:.1f}s before navigation to avoid detection")
+                        await asyncio.sleep(delay)
                         
                         # Navigate to page with networkidle for better stealth
-                        await page.goto(
+                        response = await page.goto(
                             url,
                             wait_until='networkidle',
                             timeout=timeout
                         )
+                        
+                        # Check for 500 error and apply backoff
+                        if response and response.status == 500:
+                            try:
+                                import config
+                                backoff_delay = config.AMAZON_BACKOFF_ON_500
+                            except:
+                                backoff_delay = 60
+                            
+                            logger.warning(f"Received 500 error, applying {backoff_delay}s backoff delay")
+                            await asyncio.sleep(backoff_delay)
+                            # Retry navigation after backoff
+                            response = await page.goto(
+                                url,
+                                wait_until='networkidle',
+                                timeout=timeout
+                            )
                         
                         # Wait longer for dynamic content and to appear more human-like
                         await page.wait_for_timeout(random.uniform(3000, 6000))
@@ -421,6 +472,28 @@ class BrowserPool:
                             for pattern in captcha_indicators
                         )
                         
+                        # If CAPTCHA detected and skip_on_captcha is enabled, mark as blocked immediately
+                        if has_captcha_page:
+                            try:
+                                import config
+                                skip_on_captcha = config.AMAZON_SKIP_ON_CAPTCHA
+                            except:
+                                skip_on_captcha = True
+                            
+                            if skip_on_captcha:
+                                logger.warning(f"CAPTCHA detected - skipping immediately (skip_on_captcha=True)")
+                                # Save storage state before closing
+                                try:
+                                    storage_state = await context.storage_state()
+                                    import json
+                                    with open(self.storage_state_path, 'w') as f:
+                                        json.dump(storage_state, f)
+                                    logger.debug("Saved storage state before CAPTCHA skip")
+                                except Exception as e:
+                                    logger.debug(f"Could not save storage state: {e}")
+                                
+                                raise Exception("CAPTCHA detected - skipping (blocked)")
+                        
                         # Check for normal page indicators (more comprehensive)
                         normal_indicators = [
                             r'product.*details',
@@ -481,6 +554,16 @@ class BrowserPool:
                             logger.info(f"CAPTCHA detected but page has {normal_count} normal indicators - proceeding")
                         elif has_captcha_page and len(html) >= 5000:
                             logger.info(f"CAPTCHA detected but page has {len(html)} chars - allowing extraction attempt")
+                        
+                        # Save storage state after successful fetch (persist session)
+                        try:
+                            storage_state = await context.storage_state()
+                            import json
+                            with open(self.storage_state_path, 'w') as f:
+                                json.dump(storage_state, f)
+                            logger.debug("Saved storage state after successful fetch")
+                        except Exception as e:
+                            logger.debug(f"Could not save storage state: {e}")
                         
                         logger.debug(f"Successfully fetched page: {url} (attempt {attempt + 1})")
                         return html

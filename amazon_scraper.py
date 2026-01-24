@@ -118,8 +118,36 @@ class AmazonScraper:
             try:
                 logger.info(f"Attempting to scrape BSR from {clean_url} (attempt {attempt + 1}/{self.retry_attempts})")
                 
+                # Random delay between requests (25-75 seconds)
+                try:
+                    import config
+                    delay_min = config.AMAZON_DELAY_MIN
+                    delay_max = config.AMAZON_DELAY_MAX
+                except:
+                    delay_min = 25
+                    delay_max = 75
+                
+                if attempt > 0:  # Don't delay on first attempt
+                    delay = random.uniform(delay_min, delay_max)
+                    logger.debug(f"Waiting {delay:.1f}s before request (attempt {attempt + 1})")
+                    time.sleep(delay)
+                
                 headers = self._get_headers()
                 response = self.session.get(clean_url, headers=headers, timeout=30)
+                
+                # Check for 500 error and apply backoff
+                if response.status_code == 500:
+                    try:
+                        import config
+                        backoff_delay = config.AMAZON_BACKOFF_ON_500
+                    except:
+                        backoff_delay = 60
+                    
+                    logger.warning(f"Received 500 error, applying {backoff_delay}s backoff delay")
+                    time.sleep(backoff_delay)
+                    # Retry request after backoff
+                    response = self.session.get(clean_url, headers=headers, timeout=30)
+                
                 response.raise_for_status()
                 
                 # Use strict BSR parser to extract main BSR (prioritizes "in Kindle Store" over category rankings)

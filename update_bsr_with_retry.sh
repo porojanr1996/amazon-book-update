@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script care rulează update BSR și apoi retry pentru cărțile eșuate
+# Script care rulează update BSR și apoi re-încearcă pentru cărțile eșuate
 
 echo "🔄 Actualizare BSR pentru toate worksheet-urile..."
 echo ""
@@ -12,20 +12,19 @@ if [ -d "venv" ]; then
 fi
 
 # Rulează update-ul inițial pentru toate worksheet-urile
-echo "📚 Rulează update BSR inițial..."
+echo "📚 Pasul 1: Rulează update BSR pentru toate worksheet-urile..."
 echo "da" | python3 update_bsr.py --all
 
-# Așteaptă puțin pentru ca log-urile să se scrie
+echo ""
+echo "⏳ Așteptare 5 secunde pentru finalizarea scrierii în log-uri..."
 sleep 5
 
 echo ""
-echo "============================================================"
-echo "🔍 Verificare cărți eșuate și retry..."
-echo "============================================================"
+echo "📋 Pasul 2: Analizare log-uri și identificare cărți eșuate..."
 echo ""
 
-# Rulează retry pentru cărțile eșuate
-echo "da" | python3 retry_failed_bsr.py --max-retries 2
+# Re-încearcă pentru cărțile eșuate
+echo "da" | python3 retry_failed_bsr.py --log-file app.log
 
 echo ""
 echo "✅ Proces complet finalizat!"

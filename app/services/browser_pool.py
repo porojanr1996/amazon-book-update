@@ -169,10 +169,10 @@ class BrowserPool:
                         get: () => 8
                     });
                     """)
-                    
-                    self.browsers.append(browser)
-                    self.contexts.append(context)
-                    logger.info(f"Initialized browser {i+1}/{self.pool_size}")
+                
+                self.browsers.append(browser)
+                self.contexts.append(context)
+                logger.info(f"Initialized browser {i+1}/{self.pool_size}")
                 
                 self._initialized = True
                 self._initializing = False

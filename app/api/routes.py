@@ -8,8 +8,11 @@ from typing import Optional, List
 import logging
 import re
 import time
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
+import pytz
+from apscheduler.triggers.date import DateTrigger
 
 from app.models.schemas import (
     Book, ChartData, ErrorResponse, SuccessResponse, SchedulerStatus, JobStatus
@@ -432,6 +435,55 @@ async def trigger_bsr_update(request: Request):
         raise
     except Exception as e:
         logger.error(f"Error in manual BSR update: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/schedule-test-job")
+async def schedule_test_job(request: Request):
+    """
+    Schedule a test BSR update job in X minutes (for testing)
+    """
+    try:
+        from datetime import datetime, timedelta
+        from apscheduler.triggers.date import DateTrigger
+        
+        scheduler = request.app.state.scheduler
+        if not scheduler or not scheduler.running:
+            raise HTTPException(status_code=400, detail="Scheduler is not running")
+        
+        # Get minutes from request (default 5 minutes)
+        body = await request.json()
+        minutes = body.get('minutes', 5)
+        
+        # Calculate run time (now + minutes)
+        bucharest_tz = pytz.timezone('Europe/Bucharest')
+        run_time = datetime.now(bucharest_tz) + timedelta(minutes=minutes)
+        
+        # Import Celery task
+        from app.tasks.bsr_tasks import update_all_worksheets_bsr
+        
+        # Add one-time test job
+        job_id = f'test_bsr_update_{int(run_time.timestamp())}'
+        scheduler.add_job(
+            func=lambda: update_all_worksheets_bsr.delay(),
+            trigger=DateTrigger(run_date=run_time),
+            id=job_id,
+            name=f'Test BSR Update in {minutes} minutes',
+            replace_existing=True
+        )
+        
+        logger.info(f"Test job scheduled: {job_id} at {run_time}")
+        
+        return {
+            "status": "scheduled",
+            "job_id": job_id,
+            "scheduled_time": run_time.isoformat(),
+            "minutes": minutes,
+            "message": f"Test BSR update scheduled for {run_time.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error scheduling test job: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

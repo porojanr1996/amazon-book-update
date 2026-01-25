@@ -127,52 +127,11 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                     domain_type = "UK" if is_uk else "US"
                     
                     print(f"      🔍 Extragere BSR cu Playwright ({domain_type})...", end=' ', flush=True)
-                    
-                    # Check for existing screenshots before scraping
-                    import os
-                    from pathlib import Path
-                    screenshot_dir = Path(os.getenv('SCREENSHOT_DIR', '/tmp/amazon_screenshots'))
-                    screenshots_before = set()
-                    if screenshot_dir.exists():
-                        screenshots_before = set(screenshot_dir.glob('amazon_bsr_*.png'))
-                    
                     try:
                         bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=True)
-                        
-                        # Check if a new screenshot was created (scraping stopped for OCR processing)
-                        screenshots_after = set()
-                        if screenshot_dir.exists():
-                            screenshots_after = set(screenshot_dir.glob('amazon_bsr_*.png'))
-                        
-                        new_screenshots = screenshots_after - screenshots_before
-                        if new_screenshots:
-                            # A new screenshot was created - scraping stopped
-                            latest_screenshot = max(new_screenshots, key=lambda p: p.stat().st_mtime)
-                            print(f"\n      📸 Screenshot salvat: {latest_screenshot.name}")
-                            print(f"      🛑 Scraping oprit - screenshot salvat pentru procesare OCR")
-                            print(f"\n      💡 Rulează scriptul de procesare:")
-                            print(f"         python process_screenshots.py")
-                            print(f"\n      🚫 Oprește scraping-ul pentru a procesa screenshot-ul...")
-                            # Stop processing more books
-                            print(f"\n   ⚠️  Scraping oprit după screenshot. Procesează screenshot-urile cu:")
-                            print(f"      python process_screenshots.py")
-                            break
                     except Exception as e:
                         print(f"\n      ❌ Eroare Playwright: {e}")
                         bsr = None
-                        
-                        # Check if screenshot was created even on error
-                        screenshots_after = set()
-                        if screenshot_dir.exists():
-                            screenshots_after = set(screenshot_dir.glob('amazon_bsr_*.png'))
-                        
-                        new_screenshots = screenshots_after - screenshots_before
-                        if new_screenshots:
-                            latest_screenshot = max(new_screenshots, key=lambda p: p.stat().st_mtime)
-                            print(f"\n      📸 Screenshot salvat: {latest_screenshot.name}")
-                            print(f"      🛑 Scraping oprit - screenshot salvat pentru procesare OCR")
-                            print(f"\n      💡 Rulează: python process_screenshots.py")
-                            break
                         
                         # Dacă Playwright eșuează, încearcă metoda simplă ca ultim fallback
                         if not bsr:

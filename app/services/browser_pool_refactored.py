@@ -533,13 +533,21 @@ class BrowserPool:
                                     await page.screenshot(path=str(screenshot_path), full_page=True)
                                     logger.info(f"📸 Screenshot saved: {screenshot_path}")
                                     
-                                    # Stop scraping and return special code to trigger OCR processing
-                                    logger.info("🛑 Stopping scraping - screenshot saved, will process with OCR script")
-                                    duration = time.time() - start_time
-                                    self.metrics.record_request(duration, success=False, error_reason="screenshot_saved")
-                                    await self._save_storage_state()
-                                    await page.close()
-                                    return None, "screenshot_saved"
+                                    # Process screenshot with OCR immediately
+                                    bsr_from_screenshot = await self._extract_bsr_from_screenshot(str(screenshot_path))
+                                    if bsr_from_screenshot:
+                                        logger.info(f"✅ BSR extracted from screenshot OCR: #{bsr_from_screenshot:,}")
+                                        # Return HTML with BSR embedded (for parser) and success
+                                        duration = time.time() - start_time
+                                        self.metrics.record_request(duration, success=True)
+                                        await self._save_storage_state()
+                                        # Return HTML with BSR value embedded so parser can extract it
+                                        html_with_bsr = f"<html><body>Best Sellers Rank: #{bsr_from_screenshot:,} in Kindle Store</body></html>"
+                                        await page.close()
+                                        return html_with_bsr, None
+                                    else:
+                                        logger.warning("⚠️  Could not extract BSR from screenshot OCR, continuing with HTML parsing")
+                                        # Continue with normal HTML extraction
                                 except Exception as e:
                                     logger.warning(f"Could not take/process screenshot: {e}")
                                 

@@ -416,16 +416,58 @@ class BrowserPool:
                     await page.mouse.move(random.randint(100, 500), random.randint(100, 500))
                     await page.wait_for_timeout(random.uniform(500, 1000))
                     
-                    # Scroll
-                    scroll_positions = [0.3, 0.6, 1.0]
+                    # Scroll gradually to find "See all details" section
+                    scroll_positions = [0.2, 0.4, 0.6, 0.8, 1.0]
                     for pos in scroll_positions:
                         scroll_y = await page.evaluate(f"Math.floor(document.body.scrollHeight * {pos})")
                         await page.evaluate(f"window.scrollTo({{top: {scroll_y}, behavior: 'smooth'}})")
                         await page.wait_for_timeout(random.uniform(1000, 2000))
+                        
+                        # Try to find and click "See all details" link
+                        try:
+                            # Multiple selectors for "See all details" link
+                            see_all_selectors = [
+                                '#rich_product_information-learn_more_link',
+                                'a[href*="detailBullets_feature_div"]',
+                                'a:has-text("See all details")',
+                                'a:has-text("see all details")',
+                                '.a-link-normal:has-text("See all details")',
+                            ]
+                            
+                            clicked = False
+                            for selector in see_all_selectors:
+                                try:
+                                    element = await page.query_selector(selector)
+                                    if element:
+                                        # Check if element is visible
+                                        is_visible = await element.is_visible()
+                                        if is_visible:
+                                            logger.info(f"Found 'See all details' link - clicking (selector: {selector})")
+                                            # Scroll element into view
+                                            await element.scroll_into_view_if_needed()
+                                            await page.wait_for_timeout(random.uniform(500, 1000))
+                                            # Click with human-like delay
+                                            await element.click(timeout=5000)
+                                            await page.wait_for_timeout(random.uniform(2000, 3000))  # Wait for content to load
+                                            clicked = True
+                                            logger.info("✅ Successfully clicked 'See all details'")
+                                            break
+                                except Exception as e:
+                                    logger.debug(f"Selector {selector} failed: {e}")
+                                    continue
+                            
+                            if clicked:
+                                # Wait a bit more for the expanded content to load
+                                await page.wait_for_timeout(random.uniform(1000, 2000))
+                                break  # Found and clicked, no need to continue scrolling
+                        except Exception as e:
+                            logger.debug(f"Error looking for 'See all details': {e}")
+                            continue
                     
+                    # Final wait after all scrolling/interactions
                     await page.wait_for_timeout(random.uniform(2000, 4000))
                     
-                    # Get HTML
+                    # Get HTML (now with expanded "See all details" content)
                     html = await page.content()
                     
                     # Check for CAPTCHA - IMMEDIATE ABORT

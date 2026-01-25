@@ -11,13 +11,14 @@ from google_sheets_transposed import GoogleSheetsManager
 from amazon_scraper import AmazonScraper
 import config
 
-def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
+def update_bsr_for_worksheets(worksheet_names=None, dry_run=False, retry_failed=False):
     """
     Actualizează BSR-ul pentru toate cărțile din worksheet-urile specificate
     
     Args:
         worksheet_names: Lista de worksheet-uri (None = toate)
         dry_run: Dacă True, nu scrie în Google Sheets, doar afișează
+        retry_failed: Dacă True, procesează doar cărțile care nu au BSR pentru ziua curentă
     """
     
     print("=" * 60)
@@ -111,6 +112,43 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
             print(f"   📅 Rând pentru astăzi: {today_row}")
             print(f"   🕐 Data: {datetime.now(pytz.timezone('Europe/Bucharest')).strftime('%Y-%m-%d %H:%M:%S')}")
             print()
+            
+            # Dacă e retry-failed, filtrează doar cărțile care nu au BSR pentru ziua curentă
+            if retry_failed:
+                print(f"   🔄 Mod RETRY-FAILED: Filtrare cărți fără BSR pentru ziua curentă...")
+                books_without_bsr = []
+                try:
+                    worksheet = sheets_manager.spreadsheet.worksheet(worksheet_name)
+                    all_values = worksheet.get_all_values()
+                    
+                    for book in books:
+                        col_idx = book['col'] - 1  # Convert to 0-based
+                        # Check if today_row has BSR value for this book
+                        if today_row <= len(all_values):
+                            row_values = all_values[today_row - 1]  # today_row is 1-based
+                            if col_idx < len(row_values):
+                                bsr_str = row_values[col_idx].strip()
+                                # If empty or not a number, consider it failed
+                                if not bsr_str or not bsr_str.replace(',', '').isdigit():
+                                    books_without_bsr.append(book)
+                        else:
+                            # Row doesn't exist yet, consider it failed
+                            books_without_bsr.append(book)
+                    
+                    if not books_without_bsr:
+                        print(f"   ✅ Toate cărțile au BSR pentru ziua curentă!")
+                        print()
+                        continue
+                    
+                    print(f"   📋 Găsite {len(books_without_bsr)} cărți fără BSR pentru ziua curentă:")
+                    for book in books_without_bsr:
+                        print(f"      - {book['name']}")
+                    print()
+                    books = books_without_bsr
+                except Exception as e:
+                    print(f"   ⚠️  Eroare la filtrare: {e}")
+                    print(f"   📋 Se procesează toate cărțile...")
+                    print()
             
             worksheet_success = 0
             worksheet_failed = 0
@@ -330,6 +368,8 @@ if __name__ == '__main__':
                        help='Mod dry-run: nu scrie în Google Sheets, doar afișează')
     parser.add_argument('--all', action='store_true',
                        help='Procesează toate worksheet-urile')
+    parser.add_argument('--retry-failed', action='store_true',
+                       help='Procesează doar cărțile care nu au BSR pentru ziua curentă (retry pentru eșecuri)')
     
     args = parser.parse_args()
     
@@ -345,7 +385,10 @@ if __name__ == '__main__':
         print("⚠️  ATENȚIE: Mod DRY-RUN activat - nu se vor scrie date!")
     else:
         print("⚠️  ATENȚIE: Acest script va scrie date reale în Google Sheets!")
-        print("   Va actualiza BSR-ul pentru toate cărțile din worksheet-urile selectate.")
+        if args.retry_failed:
+            print("   🔄 Mod RETRY-FAILED: Va procesa doar cărțile fără BSR pentru ziua curentă.")
+        else:
+            print("   Va actualiza BSR-ul pentru toate cărțile din worksheet-urile selectate.")
     print()
     
     if not args.dry_run:
@@ -355,6 +398,6 @@ if __name__ == '__main__':
             sys.exit(0)
         print()
     
-    success = update_bsr_for_worksheets(worksheet_names, dry_run=args.dry_run)
+    success = update_bsr_for_worksheets(worksheet_names, dry_run=args.dry_run, retry_failed=args.retry_failed)
     sys.exit(0 if success else 1)
 

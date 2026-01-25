@@ -351,14 +351,14 @@ class BrowserPool:
                         delay_max = float(env_delay_max)
                         logger.info(f"Using test delays from environment: {delay_min}-{delay_max}s")
                     else:
-                        # Use config defaults
+                        # Use config defaults (now 2-5s for local, can be overridden with env vars for production)
                         try:
                             import config
-                            delay_min = getattr(config, 'AMAZON_DELAY_MIN', 45)
-                            delay_max = getattr(config, 'AMAZON_DELAY_MAX', 120)
+                            delay_min = getattr(config, 'AMAZON_DELAY_MIN', 2)
+                            delay_max = getattr(config, 'AMAZON_DELAY_MAX', 5)
                         except:
-                            delay_min = 45
-                            delay_max = 120
+                            delay_min = 2
+                            delay_max = 5
                     
                     delay = random.uniform(delay_min, delay_max)
                     logger.info(f"⏳ Waiting {delay:.1f}s before navigation to {url}")

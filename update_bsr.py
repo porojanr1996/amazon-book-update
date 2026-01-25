@@ -114,6 +114,7 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
             
             worksheet_success = 0
             worksheet_failed = 0
+            failed_books = []  # Listă cu cărțile care au eșuat
             
             # Procesează fiecare carte
             for i, book in enumerate(books, 1):
@@ -178,11 +179,15 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                         
                         worksheet_failed += 1
                         total_failed += 1
+                        # Salvează cartea pentru retry
+                        failed_books.append(book)
                 
                 except Exception as e:
                     print(f"❌ Eroare: {e}")
                     worksheet_failed += 1
                     total_failed += 1
+                    # Salvează cartea pentru retry
+                    failed_books.append(book)
                 
                 print()
                 
@@ -202,6 +207,77 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
             print(f"      ❌ Eșecuri: {worksheet_failed}")
             print()
             
+            # Retry pentru cărțile care au eșuat (max 2 retries)
+            max_retries = 2
+            retry_count = 0
+            while failed_books and retry_count < max_retries:
+                retry_count += 1
+                print(f"   🔄 Retry #{retry_count} pentru {len(failed_books)} cărți care au eșuat...")
+                print()
+                
+                retry_failed = []
+                for i, book in enumerate(failed_books, 1):
+                    print(f"   📖 [{i}/{len(failed_books)}] RETRY: {book['name']}")
+                    print(f"      👤 Autor: {book['author']}")
+                    print(f"      🔗 URL: {book['amazon_link']}")
+                    
+                    try:
+                        is_uk = '.co.uk' in book['amazon_link'] or 'amazon.co.uk' in book['amazon_link']
+                        domain_type = "UK" if is_uk else "US"
+                        
+                        print(f"      🔍 Extragere BSR cu Playwright ({domain_type})...", end=' ', flush=True)
+                        try:
+                            bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=True)
+                        except Exception as e:
+                            print(f"\n      ❌ Eroare Playwright: {e}")
+                            bsr = None
+                            
+                            if not bsr:
+                                print(f"      🔄 Încercare cu metoda simplă (fallback)...", end=' ', flush=True)
+                                try:
+                                    bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=False)
+                                except Exception as e2:
+                                    print(f"\n      ❌ Eroare metoda simplă: {e2}")
+                                    bsr = None
+                        
+                        if bsr:
+                            print(f"✅ BSR: #{bsr:,}")
+                            
+                            if not dry_run:
+                                sheets_manager.update_bsr(book['col'], today_row, bsr, worksheet_name)
+                                print(f"      ✅ Scris în Google Sheets (coloana {book['col']}, rândul {today_row})")
+                            else:
+                                print(f"      ⚠️  DRY-RUN: Ar fi scris BSR #{bsr:,} în coloana {book['col']}, rândul {today_row}")
+                            
+                            worksheet_success += 1
+                            total_success += 1
+                            worksheet_failed -= 1
+                            total_failed -= 1
+                        else:
+                            print(f"❌ Nu s-a putut extrage BSR (retry {retry_count}/{max_retries})")
+                            retry_failed.append(book)
+                        
+                    except Exception as e:
+                        print(f"❌ Eroare: {e}")
+                        retry_failed.append(book)
+                    
+                    print()
+                    
+                    # Delay între request-uri
+                    if i < len(failed_books):
+                        delay = config.AMAZON_DELAY_BETWEEN_REQUESTS * 1.5  # Mai mult delay la retry
+                        print(f"      ⏳ Așteptare {delay:.1f}s între request-uri...")
+                        time.sleep(delay)
+                        print()
+                
+                failed_books = retry_failed
+                
+                if failed_books:
+                    print(f"   ⚠️  {len(failed_books)} cărți au eșuat și la retry #{retry_count}")
+                    if retry_count < max_retries:
+                        print(f"   🔄 Se va încerca încă o dată...")
+                    print()
+            
             # Calculează și actualizează media (dacă nu e dry-run)
             if not dry_run and worksheet_success > 0:
                 try:
@@ -210,6 +286,13 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                     print(f"   ✅ Medie actualizată")
                 except Exception as e:
                     print(f"   ⚠️  Eroare la calcularea mediei: {e}")
+                print()
+            
+            # Dacă mai sunt cărți care au eșuat după toate retry-urile
+            if failed_books:
+                print(f"   ⚠️  {len(failed_books)} cărți au eșuat după {max_retries} încercări:")
+                for book in failed_books:
+                    print(f"      - {book['name']} ({book['amazon_link']})")
                 print()
         
         except Exception as e:

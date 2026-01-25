@@ -34,12 +34,14 @@ fi
 
 echo "   Folosind: $CELERY_APP"
 
-# Pornește worker-ul în background
+# Pornește worker-ul în background cu nume unic
+WORKER_NAME="celery-worker-$(hostname)"
 nohup celery -A $CELERY_APP worker \
     --loglevel=info \
     --logfile=logs/celery-worker.log \
     --detach \
-    --pidfile=logs/celery-worker.pid
+    --pidfile=logs/celery-worker.pid \
+    -n "$WORKER_NAME"
 
 sleep 3
 

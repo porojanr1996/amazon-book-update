@@ -519,13 +519,12 @@ class BrowserPool:
                                 
                                 # Take screenshot after clicking "See all details"
                                 try:
-                                    import os
                                     from pathlib import Path
+                                    import hashlib
                                     screenshot_dir = Path(os.getenv('SCREENSHOT_DIR', '/tmp/amazon_screenshots'))
                                     screenshot_dir.mkdir(parents=True, exist_ok=True)
                                     
                                     # Generate screenshot filename with timestamp and URL hash
-                                    import hashlib
                                     url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
                                     timestamp = int(time.time())
                                     screenshot_path = screenshot_dir / f"amazon_bsr_{timestamp}_{url_hash}.png"

@@ -33,17 +33,17 @@ else
         
         # Instalează dependențele pentru compilare
         if command -v dnf > /dev/null 2>&1; then
-            echo "   Instalare dependențe (gcc, make, wget/tar)..."
-            sudo dnf install -y gcc make wget tar 2>/dev/null || sudo dnf install -y gcc make curl tar 2>/dev/null || {
+            echo "   Instalare dependențe (gcc, g++, make, wget/tar)..."
+            sudo dnf install -y gcc gcc-c++ make wget tar 2>/dev/null || sudo dnf install -y gcc gcc-c++ make curl tar 2>/dev/null || {
                 echo "   ⚠️  Nu pot instala dependențele automat"
-                echo "   Instalează manual: sudo dnf install -y gcc make wget tar"
+                echo "   Instalează manual: sudo dnf install -y gcc gcc-c++ make wget tar"
                 exit 1
             }
         else
-            echo "   Instalare dependențe (gcc, make, wget/tar)..."
-            sudo yum install -y gcc make wget tar 2>/dev/null || sudo yum install -y gcc make curl tar 2>/dev/null || {
+            echo "   Instalare dependențe (gcc, g++, make, wget/tar)..."
+            sudo yum install -y gcc gcc-c++ make wget tar 2>/dev/null || sudo yum install -y gcc gcc-c++ make curl tar 2>/dev/null || {
                 echo "   ⚠️  Nu pot instala dependențele automat"
-                echo "   Instalează manual: sudo yum install -y gcc make wget tar"
+                echo "   Instalează manual: sudo yum install -y gcc gcc-c++ make wget tar"
                 exit 1
             }
         fi
@@ -74,9 +74,14 @@ else
         
         cd redis-stable
         echo "   Compilare Redis (poate dura câteva minute)..."
-        make || {
-            echo "   ❌ Compilarea a eșuat"
-            exit 1
+        # Compilează fără jemalloc pentru a evita problemele de compilare
+        make MALLOC=libc || {
+            echo "   ⚠️  Compilare cu MALLOC=libc a eșuat, încerc fără opțiuni..."
+            make || {
+                echo "   ❌ Compilarea a eșuat"
+                echo "   Verifică erorile de mai sus"
+                exit 1
+            }
         }
         
         echo "   Instalare Redis..."

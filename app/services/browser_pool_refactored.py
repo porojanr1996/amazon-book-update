@@ -283,7 +283,7 @@ class BrowserPool:
                 page = await context.new_page()
                 
                 try:
-                    # Random delay: 45-120 seconds
+                    # Random delay: 45-120 seconds (or from env for testing)
                     try:
                         import config
                         delay_min = getattr(config, 'AMAZON_DELAY_MIN', 45)
@@ -292,9 +292,19 @@ class BrowserPool:
                         delay_min = 45
                         delay_max = 120
                     
+                    # Allow override from environment for testing
+                    env_delay_min = os.getenv('AMAZON_DELAY_MIN')
+                    env_delay_max = os.getenv('AMAZON_DELAY_MAX')
+                    if env_delay_min:
+                        delay_min = float(env_delay_min)
+                    if env_delay_max:
+                        delay_max = float(env_delay_max)
+                    
                     delay = random.uniform(delay_min, delay_max)
-                    logger.debug(f"Waiting {delay:.1f}s before navigation")
+                    logger.info(f"⏳ Waiting {delay:.1f}s before navigation to {url}")
                     await asyncio.sleep(delay)
+                    
+                    logger.info(f"🌐 Navigating to {url}...")
                     
                     # Navigate with exponential backoff for 500/503
                     max_retries = 3
@@ -303,11 +313,13 @@ class BrowserPool:
                     response = None
                     for retry_attempt in range(max_retries):
                         try:
+                            logger.info(f"📡 Attempting to navigate to {url} (attempt {retry_attempt + 1}/{max_retries})")
                             response = await page.goto(
                                 url,
                                 wait_until='networkidle',
                                 timeout=timeout
                             )
+                            logger.info(f"✅ Navigation successful, status: {response.status if response else 'N/A'}")
                             
                             # Check for 500/503 errors
                             if response and response.status in [500, 503]:

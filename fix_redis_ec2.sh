@@ -28,51 +28,79 @@ else
     if [ "$OS" = "amzn" ] || [ "$OS" = "rhel" ] || [ "$OS" = "centos" ]; then
         # Amazon Linux / RHEL / CentOS
         echo "   Detected: Amazon Linux / RHEL / CentOS"
+        echo "   ⚠️  Redis nu este în repo-uri standard pentru Amazon Linux 2023"
+        echo "   Compilare Redis din sursă..."
         
-        # Pentru Amazon Linux 2023, Redis nu este în repo-uri standard
-        # Încercăm să instalam din sursă sau folosim dnf
+        # Instalează dependențele pentru compilare
         if command -v dnf > /dev/null 2>&1; then
-            echo "   Folosind dnf pentru Amazon Linux 2023..."
-            # Încercă să instaleze din EPEL sau sursă
-            sudo dnf install -y gcc make wget tar || true
-            
-            # Descarcă și compilează Redis
-            echo "   Descărcare și compilare Redis din sursă..."
-            cd /tmp
-            wget https://download.redis.io/redis-stable.tar.gz || curl -O https://download.redis.io/redis-stable.tar.gz
-            tar xzf redis-stable.tar.gz
-            cd redis-stable
-            make
-            sudo make install
-            
-            # Creează directorul pentru configurare
-            sudo mkdir -p /etc/redis
-            sudo mkdir -p /var/lib/redis
-            sudo mkdir -p /var/log/redis
-            
-            # Copiază fișierul de configurare
+            echo "   Instalare dependențe (gcc, make, wget/tar)..."
+            sudo dnf install -y gcc make wget tar 2>/dev/null || sudo dnf install -y gcc make curl tar 2>/dev/null || {
+                echo "   ⚠️  Nu pot instala dependențele automat"
+                echo "   Instalează manual: sudo dnf install -y gcc make wget tar"
+                exit 1
+            }
+        else
+            echo "   Instalare dependențe (gcc, make, wget/tar)..."
+            sudo yum install -y gcc make wget tar 2>/dev/null || sudo yum install -y gcc make curl tar 2>/dev/null || {
+                echo "   ⚠️  Nu pot instala dependențele automat"
+                echo "   Instalează manual: sudo yum install -y gcc make wget tar"
+                exit 1
+            }
+        fi
+        
+        # Descarcă și compilează Redis
+        echo "   Descărcare Redis..."
+        cd /tmp
+        if command -v wget > /dev/null 2>&1; then
+            wget https://download.redis.io/redis-stable.tar.gz || {
+                echo "   ⚠️  wget a eșuat, încerc cu curl..."
+                curl -L -o redis-stable.tar.gz https://download.redis.io/redis-stable.tar.gz || {
+                    echo "   ❌ Nu pot descărca Redis"
+                    exit 1
+                }
+            }
+        else
+            curl -L -o redis-stable.tar.gz https://download.redis.io/redis-stable.tar.gz || {
+                echo "   ❌ Nu pot descărca Redis"
+                exit 1
+            }
+        fi
+        
+        echo "   Dezarhivare..."
+        tar xzf redis-stable.tar.gz || {
+            echo "   ❌ Nu pot dezarhiva Redis"
+            exit 1
+        }
+        
+        cd redis-stable
+        echo "   Compilare Redis (poate dura câteva minute)..."
+        make || {
+            echo "   ❌ Compilarea a eșuat"
+            exit 1
+        }
+        
+        echo "   Instalare Redis..."
+        sudo make install || {
+            echo "   ❌ Instalarea a eșuat"
+            exit 1
+        }
+        
+        # Creează directoarele pentru configurare
+        echo "   Configurare Redis..."
+        sudo mkdir -p /etc/redis
+        sudo mkdir -p /var/lib/redis
+        sudo mkdir -p /var/log/redis
+        
+        # Copiază și configurează redis.conf
+        if [ -f redis.conf ]; then
             sudo cp redis.conf /etc/redis/redis.conf
             sudo sed -i 's/^daemonize no/daemonize yes/' /etc/redis/redis.conf
             sudo sed -i 's|^dir ./|dir /var/lib/redis|' /etc/redis/redis.conf
             sudo sed -i 's|^logfile ""|logfile /var/log/redis/redis.log|' /etc/redis/redis.conf
-            
-            cd "$SCRIPT_DIR"
-        else
-            # Pentru versiuni mai vechi de Amazon Linux
-            sudo yum update -y
-            sudo yum install -y epel-release || true
-            sudo yum install -y redis || {
-                echo "   ⚠️  Redis nu este disponibil în repo-uri. Compilare din sursă..."
-                sudo yum install -y gcc make wget tar
-                cd /tmp
-                wget https://download.redis.io/redis-stable.tar.gz || curl -O https://download.redis.io/redis-stable.tar.gz
-                tar xzf redis-stable.tar.gz
-                cd redis-stable
-                make
-                sudo make install
-                cd "$SCRIPT_DIR"
-            }
         fi
+        
+        cd "$SCRIPT_DIR"
+        echo "   ✅ Redis compilat și instalat cu succes!"
     elif [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
         # Ubuntu / Debian
         echo "   Detected: Ubuntu / Debian"

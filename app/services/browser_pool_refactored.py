@@ -347,6 +347,70 @@ class BrowserPool:
                             else:
                                 raise
                     
+                    # Check for "Continue shopping" interstitial page and handle it
+                    await page.wait_for_timeout(2000)  # Wait for page to fully load
+                    page_content = await page.content()
+                    page_text = await page.inner_text('body')
+                    
+                    # Detect "Continue shopping" interstitial page
+                    if 'continue shopping' in page_text.lower() or 'click the button below to continue' in page_text.lower():
+                        logger.warning("⚠️  Detected 'Continue shopping' interstitial page - attempting to click button")
+                        try:
+                            # Try multiple selectors for the continue button
+                            button_selectors = [
+                                'button:has-text("Continue shopping")',
+                                'a:has-text("Continue shopping")',
+                                'input[value*="Continue"]',
+                                'button[type="submit"]',
+                                '.a-button-primary:has-text("Continue")',
+                            ]
+                            
+                            clicked = False
+                            for selector in button_selectors:
+                                try:
+                                    button = await page.query_selector(selector)
+                                    if button:
+                                        logger.info(f"Clicking 'Continue shopping' button (selector: {selector})")
+                                        await button.click()
+                                        await page.wait_for_timeout(3000)  # Wait for redirect
+                                        clicked = True
+                                        break
+                                except Exception as e:
+                                    logger.debug(f"Selector {selector} failed: {e}")
+                                    continue
+                            
+                            if not clicked:
+                                # Try clicking by text content
+                                try:
+                                    await page.click('text=Continue shopping', timeout=5000)
+                                    await page.wait_for_timeout(3000)
+                                    clicked = True
+                                    logger.info("Clicked 'Continue shopping' by text")
+                                except:
+                                    pass
+                            
+                            if clicked:
+                                # Wait for navigation after click
+                                await page.wait_for_load_state('networkidle', timeout=10000)
+                                logger.info("✅ Successfully clicked 'Continue shopping' - page should redirect")
+                            else:
+                                logger.warning("Could not find/click 'Continue shopping' button")
+                        except Exception as e:
+                            logger.warning(f"Error handling 'Continue shopping' page: {e}")
+                    
+                    # Re-check page content after handling interstitial
+                    page_content = await page.content()
+                    page_text = await page.inner_text('body')
+                    
+                    # Check again if we're still on interstitial page after click
+                    if 'continue shopping' in page_text.lower() and 'click the button below' in page_text.lower():
+                        # Still on interstitial - this is likely a blocking page
+                        logger.warning("Still on 'Continue shopping' page after click - likely blocked")
+                        duration = time.time() - start_time
+                        self.metrics.record_request(duration, success=False, error_reason="continue_shopping_interstitial")
+                        await self._save_storage_state()
+                        return None, "continue_shopping_interstitial"
+                    
                     # Human-like behavior
                     await page.wait_for_timeout(random.uniform(2000, 4000))
                     await page.mouse.move(random.randint(100, 500), random.randint(100, 500))

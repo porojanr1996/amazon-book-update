@@ -120,7 +120,6 @@ def download_covers_for_worksheets(worksheet_names=None, covers_dir=None, dry_ru
     # Conectare la Google Sheets
     print("📋 Conectare la Google Sheets...")
     try:
-        import os
         creds_path = config.GOOGLE_SHEETS_CREDENTIALS_PATH
         
         if not os.path.exists(creds_path):

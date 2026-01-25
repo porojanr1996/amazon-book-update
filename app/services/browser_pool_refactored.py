@@ -40,17 +40,22 @@ class BrowserPool:
     - Metrics tracking
     """
     
-    def __init__(self, headless: bool = True):
+    def __init__(self, headless: Optional[bool] = None):
         """
         Initialize browser pool
         
         Args:
-            headless: Run browser in headless mode
+            headless: Run browser in headless mode (None = auto-detect from env)
         """
         if not PLAYWRIGHT_AVAILABLE:
             raise ImportError("Playwright not installed. Install with: pip install playwright && playwright install chromium")
         
-        self.headless = headless
+        # Auto-detect from environment variable if not specified
+        if headless is None:
+            headless_env = os.getenv('PLAYWRIGHT_HEADLESS', 'true').lower()
+            self.headless = headless_env not in ['false', '0', 'no', 'off']
+        else:
+            self.headless = headless
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None

@@ -49,6 +49,11 @@ async def extract_bsr_with_playwright(amazon_url: str) -> Tuple[Optional[int], O
             logger.warning(f"CAPTCHA detected for {clean_url} - aborting extraction")
             return None, "captcha"
         
+        if error_reason == "screenshot_saved":
+            # Screenshot saved - stop scraping for OCR processing
+            logger.info(f"Screenshot saved for {clean_url} - stopping scraping for OCR processing")
+            return None, "screenshot_saved"
+        
         if not html:
             logger.warning(f"Failed to fetch page: {error_reason}")
             return None, error_reason

@@ -129,6 +129,26 @@ def update_bsr_for_worksheets(worksheet_names=None, dry_run=False):
                     print(f"      🔍 Extragere BSR cu Playwright ({domain_type})...", end=' ', flush=True)
                     try:
                         bsr = scraper.extract_bsr(book['amazon_link'], use_playwright=True)
+                        
+                        # Check if screenshot was saved (scraping stopped for OCR processing)
+                        if bsr is None:
+                            # Check if there's a screenshot saved
+                            import os
+                            from pathlib import Path
+                            screenshot_dir = Path(os.getenv('SCREENSHOT_DIR', '/tmp/amazon_screenshots'))
+                            if screenshot_dir.exists():
+                                screenshots = list(screenshot_dir.glob('amazon_bsr_*.png'))
+                                if screenshots:
+                                    # Most recent screenshot
+                                    latest_screenshot = max(screenshots, key=lambda p: p.stat().st_mtime)
+                                    print(f"\n      📸 Screenshot salvat: {latest_screenshot}")
+                                    print(f"      🛑 Scraping oprit - rulează scriptul de OCR pentru extragere BSR")
+                                    print(f"\n      💡 Rulează: python extract_bsr_from_screenshot.py {latest_screenshot}")
+                                    print(f"\n      🚫 Oprește scraping-ul pentru a procesa screenshot-ul...")
+                                    # Stop processing more books
+                                    print(f"\n   ⚠️  Scraping oprit după screenshot. Procesează screenshot-urile cu:")
+                                    print(f"      python process_screenshots.py")
+                                    break
                     except Exception as e:
                         print(f"\n      ❌ Eroare Playwright: {e}")
                         bsr = None

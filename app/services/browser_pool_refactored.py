@@ -533,15 +533,13 @@ class BrowserPool:
                                     await page.screenshot(path=str(screenshot_path), full_page=True)
                                     logger.info(f"📸 Screenshot saved: {screenshot_path}")
                                     
-                                    # Also try to extract BSR from screenshot using OCR
-                                    bsr_from_screenshot = await self._extract_bsr_from_screenshot(str(screenshot_path))
-                                    if bsr_from_screenshot:
-                                        logger.info(f"✅ BSR extracted from screenshot: #{bsr_from_screenshot:,}")
-                                        # Return early with BSR from screenshot
-                                        duration = time.time() - start_time
-                                        self.metrics.record_request(duration, success=True)
-                                        await self._save_storage_state()
-                                        return f"<html><body>BSR from screenshot: {bsr_from_screenshot}</body></html>", None
+                                    # Stop scraping and return special code to trigger OCR processing
+                                    logger.info("🛑 Stopping scraping - screenshot saved, will process with OCR script")
+                                    duration = time.time() - start_time
+                                    self.metrics.record_request(duration, success=False, error_reason="screenshot_saved")
+                                    await self._save_storage_state()
+                                    await page.close()
+                                    return None, "screenshot_saved"
                                 except Exception as e:
                                     logger.warning(f"Could not take/process screenshot: {e}")
                                 

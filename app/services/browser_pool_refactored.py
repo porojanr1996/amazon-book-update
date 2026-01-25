@@ -419,7 +419,7 @@ _pool: Optional[BrowserPool] = None
 _pool_lock = Lock()
 
 
-async def get_browser_pool(headless: bool = True) -> BrowserPool:
+async def get_browser_pool(headless: Optional[bool] = None) -> BrowserPool:
     """Get global browser pool instance (singleton)"""
     global _pool
     if _pool is None:

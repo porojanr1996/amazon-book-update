@@ -462,10 +462,23 @@ async def schedule_test_job(request: Request):
         # Import Celery task
         from app.tasks.bsr_tasks import update_all_worksheets_bsr
         
+        # Wrapper function to ensure task is sent correctly
+        def send_bsr_task():
+            """Wrapper to send BSR update task to Celery"""
+            try:
+                logger.info("Sending BSR update task to Celery...")
+                result = update_all_worksheets_bsr.delay()
+                logger.info(f"BSR update task sent to Celery with ID: {result.id}")
+                logger.info(f"Task state: {result.state}")
+                return result
+            except Exception as e:
+                logger.error(f"Error sending BSR update task to Celery: {e}", exc_info=True)
+                raise
+        
         # Add one-time test job
         job_id = f'test_bsr_update_{int(run_time.timestamp())}'
         scheduler.add_job(
-            func=lambda: update_all_worksheets_bsr.delay(),
+            func=send_bsr_task,
             trigger=DateTrigger(run_date=run_time),
             id=job_id,
             name=f'Test BSR Update in {minutes} minutes',

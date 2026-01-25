@@ -41,9 +41,23 @@ app.include_router(router)
 scheduler = None
 try:
     from app.tasks.bsr_tasks import update_all_worksheets_bsr
+    
+    # Wrapper function to ensure task is sent correctly
+    def send_daily_bsr_task():
+        """Wrapper to send daily BSR update task to Celery"""
+        try:
+            logger.info("Sending daily BSR update task to Celery...")
+            result = update_all_worksheets_bsr.delay()
+            logger.info(f"Daily BSR update task sent to Celery with ID: {result.id}")
+            logger.info(f"Task state: {result.state}")
+            return result
+        except Exception as e:
+            logger.error(f"Error sending daily BSR update task to Celery: {e}", exc_info=True)
+            raise
+    
     scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/Bucharest'))
     scheduler.add_job(
-        func=lambda: update_all_worksheets_bsr.delay(),  # Use Celery task
+        func=send_daily_bsr_task,  # Use wrapper function
         trigger=CronTrigger(hour=10, minute=0, timezone=pytz.timezone('Europe/Bucharest')),
         id='daily_bsr_update',
         name='Daily BSR Update at 10:00 AM Bucharest time',

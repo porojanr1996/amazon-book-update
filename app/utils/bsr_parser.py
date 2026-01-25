@@ -115,11 +115,13 @@ def _extract_from_page_text(soup: BeautifulSoup) -> Optional[int]:
     # Priority 1: Main BSR patterns (works for both US and UK)
     patterns = [
         # Main BSR - US format: "Best Sellers Rank: #X in Kindle Store" (highest priority)
-        r'Best\s+Sellers\s+Rank:\s*#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
-        r'Amazon\s+Best\s+Sellers\s+Rank:\s*#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
+        # Handles both with and without "(See Top 100 in Kindle Store)" suffix
+        r'Best\s+Sellers\s+Rank:\s*#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store(?:\s*\(See\s+Top.*?\))?',
+        r'Amazon\s+Best\s+Sellers\s+Rank:\s*#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store(?:\s*\(See\s+Top.*?\))?',
         # Main BSR - UK format: "Best Sellers Rank: X in Kindle Store" (without #)
-        r'Best\s+Sellers\s+Rank:\s*(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
-        r'Amazon\s+Best\s+Sellers\s+Rank:\s*(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
+        # Handles both with and without "(See Top 100 in Kindle Store)" suffix
+        r'Best\s+Sellers\s+Rank:\s*(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store(?:\s*\(See\s+Top.*?\))?',
+        r'Amazon\s+Best\s+Sellers\s+Rank:\s*(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store(?:\s*\(See\s+Top.*?\))?',
         # UK format: "Best Sellers Rank: X" (without "in Kindle Store" sometimes)
         r'Best\s+Sellers\s+Rank:\s*#?(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle',
         # Main BSR with "See Top" - prioritize Kindle Store (both formats)

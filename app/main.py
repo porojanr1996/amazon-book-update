@@ -44,9 +44,9 @@ try:
     scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/Bucharest'))
     scheduler.add_job(
         func=lambda: update_all_worksheets_bsr.delay(),  # Use Celery task
-        trigger=CronTrigger(hour=10, minute=1, timezone=pytz.timezone('Europe/Bucharest')),
+        trigger=CronTrigger(hour=10, minute=0, timezone=pytz.timezone('Europe/Bucharest')),
         id='daily_bsr_update',
-        name='Daily BSR Update at 10:01 AM Bucharest time',
+        name='Daily BSR Update at 10:00 AM Bucharest time',
         replace_existing=True
     )
     logger.info("Scheduler initialized with Celery tasks")
@@ -65,7 +65,7 @@ async def startup_event():
         try:
             scheduler.start()
             logger.info("Scheduler started successfully")
-            logger.info("Daily BSR update scheduled for 10:01 AM Bucharest time")
+            logger.info("Daily BSR update scheduled for 10:00 AM Bucharest time")
         except Exception as e:
             logger.error(f"Failed to start scheduler: {e}", exc_info=True)
     else:

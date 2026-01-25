@@ -1,7 +1,8 @@
 #!/bin/bash
 # User data script pentru EC2 - Setup complet automat
 
-set -e
+set -e  # Exit on error, dar continuă cu log-uri
+exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "🚀 Starting EC2 setup for Books Reporting..."
 
@@ -34,25 +35,27 @@ yum install python3 python3-pip -y
 mkdir -p /home/ec2-user/app
 cd /home/ec2-user/app
 
-# Clone repository (sau copiază codul)
-# git clone https://github.com/YOUR_USERNAME/books-reporting.git
-# cd books-reporting
+# Clone repository
+echo "Cloning repository..."
+git clone https://github.com/porojanr1996/amazon-book-update.git books-reporting || echo "Repository may already exist"
+cd books-reporting || cd /home/ec2-user/app/books-reporting
 
 # Download credentials from Secrets Manager
 echo "Downloading credentials from Secrets Manager..."
+cd /home/ec2-user/app/books-reporting || cd /home/ec2-user/books-reporting
 aws secretsmanager get-secret-value \
   --secret-id books-reporting/google-sheets-credentials \
   --region eu-north-1 \
   --query SecretString \
-  --output text > credentials.json
-chmod 400 credentials.json
+  --output text > credentials.json || echo "⚠️ Failed to download credentials, will need manual setup"
+chmod 400 credentials.json || true
 
 # Get Spreadsheet ID from Secrets Manager
 SPREADSHEET_ID=$(aws secretsmanager get-secret-value \
   --secret-id books-reporting/spreadsheet-id \
   --region eu-north-1 \
   --query SecretString \
-  --output text | tr -d '"')
+  --output text 2>/dev/null | tr -d '"' || echo "1-y5ly84oAV1GkhpLlD3MfvLZSi-5UThypHXsmch6RiA")
 
 # Get ElastiCache endpoint (trebuie să-l configurezi manual sau să-l pui în Secrets Manager)
 # REDIS_ENDPOINT=$(aws secretsmanager get-secret-value \
@@ -76,8 +79,16 @@ FLASK_ENV=production
 EOF
 
 # Start services with Docker Compose
-echo "Starting services..."
-docker-compose -f docker/docker-compose.yml up -d
+echo "Starting services with Docker Compose..."
+cd /home/ec2-user/app/books-reporting || cd /home/ec2-user/books-reporting
+docker-compose -f docker/docker-compose.yml up -d --build
+
+# Wait for services to be ready
+echo "Waiting for services to start..."
+sleep 10
+
+# Check service status
+docker-compose -f docker/docker-compose.yml ps
 
 echo "✅ Setup complete!"
 echo "Aplicația rulează pe: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5001"

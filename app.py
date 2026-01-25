@@ -1328,9 +1328,9 @@ def run_daily_bsr_update():
 scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/Bucharest'))
 scheduler.add_job(
     func=run_daily_bsr_update,
-    trigger=CronTrigger(hour=10, minute=1, timezone=pytz.timezone('Europe/Bucharest')),
+    trigger=CronTrigger(hour=10, minute=0, timezone=pytz.timezone('Europe/Bucharest')),
     id='daily_bsr_update',
-    name='Daily BSR Update at 10:01 AM Bucharest time',
+    name='Daily BSR Update at 10:00 AM Bucharest time',
     replace_existing=True
 )
 

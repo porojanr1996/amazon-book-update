@@ -42,7 +42,12 @@ async def extract_bsr_with_playwright(amazon_url: str) -> Tuple[Optional[int], O
     
     try:
         logger.debug(f"Fetching page with Playwright for BSR: {clean_url}")
-        html, error_reason = await fetch_page(clean_url, timeout=30000)
+        html, error_reason, bsr_from_screenshot = await fetch_page(clean_url, timeout=30000)
+        
+        # If BSR was extracted from screenshot OCR, return it directly
+        if bsr_from_screenshot:
+            logger.info(f"✅ BSR extracted from screenshot OCR: #{bsr_from_screenshot:,}")
+            return bsr_from_screenshot, None
         
         if error_reason == "captcha":
             # CAPTCHA detected - abort immediately, do not retry
@@ -62,10 +67,11 @@ async def extract_bsr_with_playwright(amazon_url: str) -> Tuple[Optional[int], O
         if STRICT_BSR_PARSER_AVAILABLE:
             bsr = strict_parse_bsr(html)
             if bsr:
-                logger.info(f"✅ BSR extracted: #{bsr:,}")
+                logger.info(f"✅ BSR extracted from HTML: #{bsr:,}")
                 return bsr, None
             else:
-                logger.warning(f"BSR not found in HTML for {clean_url}")
+                # Don't log warning if we already tried screenshot OCR
+                logger.debug(f"BSR not found in HTML for {clean_url}")
                 return None, "bsr_not_found"
         else:
             # Fallback parser

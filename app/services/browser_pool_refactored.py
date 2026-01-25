@@ -314,7 +314,7 @@ class BrowserPool:
             logger.warning(f"Error extracting BSR from screenshot: {e}")
             return None
     
-    async def fetch_page(self, url: str, timeout: int = 30000) -> Tuple[Optional[str], Optional[str]]:
+    async def fetch_page(self, url: str, timeout: int = 30000) -> Tuple[Optional[str], Optional[str], Optional[int]]:
         """
         Fetch page HTML with production-ready error handling
         
@@ -537,14 +537,14 @@ class BrowserPool:
                                     bsr_from_screenshot = await self._extract_bsr_from_screenshot(str(screenshot_path))
                                     if bsr_from_screenshot:
                                         logger.info(f"✅ BSR extracted from screenshot OCR: #{bsr_from_screenshot:,}")
-                                        # Return HTML with BSR embedded (for parser) and success
+                                        # Return BSR directly (third return value)
                                         duration = time.time() - start_time
                                         self.metrics.record_request(duration, success=True)
                                         await self._save_storage_state()
-                                        # Return HTML with BSR value embedded so parser can extract it
-                                        html_with_bsr = f"<html><body>Best Sellers Rank: #{bsr_from_screenshot:,} in Kindle Store</body></html>"
                                         await page.close()
-                                        return html_with_bsr, None
+                                        # Return HTML with BSR embedded AND BSR value directly
+                                        html_with_bsr = f"<html><body>Best Sellers Rank: #{bsr_from_screenshot:,} in Kindle Store</body></html>"
+                                        return html_with_bsr, None, bsr_from_screenshot
                                     else:
                                         logger.warning("⚠️  Could not extract BSR from screenshot OCR, continuing with HTML parsing")
                                         # Continue with normal HTML extraction
@@ -574,7 +574,7 @@ class BrowserPool:
                     duration = time.time() - start_time
                     self.metrics.record_request(duration, success=True)
                     await self._save_storage_state()
-                    return html, None
+                    return html, None, None  # (html, error_reason, bsr_from_screenshot)
                 
                 finally:
                     await page.close()
@@ -583,7 +583,7 @@ class BrowserPool:
             # CAPTCHA - do not retry, abort immediately
             duration = time.time() - start_time
             self.metrics.record_request(duration, success=False, captcha=True, error_reason="captcha")
-            return None, "captcha"
+            return None, "captcha", None
         
         except (PlaywrightTimeoutError, asyncio.TimeoutError) as e:
             # Timeout - network error, could retry but we don't here
@@ -591,7 +591,7 @@ class BrowserPool:
             error_reason = "timeout"
             self.metrics.record_request(duration, success=False, retried=retried, error_reason=error_reason)
             logger.warning(f"Timeout fetching {url}: {e}")
-            return None, error_reason
+            return None, error_reason, None
         
         except Exception as e:
             # Other errors
@@ -604,7 +604,7 @@ class BrowserPool:
             
             self.metrics.record_request(duration, success=False, retried=retried, error_reason=error_reason)
             logger.error(f"Error fetching {url}: {e}")
-            return None, error_reason
+            return None, error_reason, None
     
     async def cleanup(self):
         """Cleanup browser resources"""
@@ -642,12 +642,15 @@ async def get_browser_pool(headless: Optional[bool] = None) -> BrowserPool:
     return _pool
 
 
-async def fetch_page(url: str, timeout: int = 30000) -> Tuple[Optional[str], Optional[str]]:
+async def fetch_page(url: str, timeout: int = 30000) -> Tuple[Optional[str], Optional[str], Optional[int]]:
     """
     Fetch page using global browser pool
     
     Returns:
-        Tuple of (html, error_reason)
+        Tuple of (html, error_reason, bsr_from_screenshot)
+        - If BSR extracted from screenshot: (html, None, bsr_value)
+        - If successful: (html, None, None)
+        - If error: (None, error_reason, None)
     """
     pool = await get_browser_pool()
     return await pool.fetch_page(url, timeout)

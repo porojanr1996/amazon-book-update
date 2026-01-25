@@ -21,8 +21,8 @@ SCHEDULE_TIMEZONE = timezone(os.getenv('SCHEDULE_TIMEZONE', 'Europe/Bucharest'))
 
 # Amazon Scraping Configuration (Production-ready settings)
 AMAZON_DELAY_BETWEEN_REQUESTS = float(os.getenv('AMAZON_DELAY_BETWEEN_REQUESTS', '45'))  # Base delay
-AMAZON_DELAY_MIN = float(os.getenv('AMAZON_DELAY_MIN', '45'))  # Min delay (seconds) - increased for stealth
-AMAZON_DELAY_MAX = float(os.getenv('AMAZON_DELAY_MAX', '120'))  # Max delay (seconds) - increased for stealth
+AMAZON_DELAY_MIN = float(os.getenv('AMAZON_DELAY_MIN', '2'))  # Min delay (seconds) - 2s for local, 45s for production
+AMAZON_DELAY_MAX = float(os.getenv('AMAZON_DELAY_MAX', '5'))  # Max delay (seconds) - 5s for local, 120s for production
 AMAZON_BACKOFF_ON_500 = float(os.getenv('AMAZON_BACKOFF_ON_500', '60'))  # Initial backoff on 500 error (seconds)
 AMAZON_RETRY_ATTEMPTS = int(os.getenv('AMAZON_RETRY_ATTEMPTS', '1'))  # Reduced - no aggressive retries
 AMAZON_MAX_WORKERS = int(os.getenv('AMAZON_MAX_WORKERS', '1'))  # Single worker - no parallel scraping

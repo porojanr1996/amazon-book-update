@@ -257,6 +257,63 @@ class BrowserPool:
         except Exception as e:
             logger.debug(f"Could not save storage state: {e}")
     
+    async def _extract_bsr_from_screenshot(self, screenshot_path: str) -> Optional[int]:
+        """
+        Extract BSR from screenshot using OCR
+        
+        Args:
+            screenshot_path: Path to screenshot image
+            
+        Returns:
+            BSR value or None
+        """
+        try:
+            # Try to use OCR to extract text from screenshot
+            try:
+                import pytesseract
+                from PIL import Image
+                OCR_AVAILABLE = True
+            except ImportError:
+                OCR_AVAILABLE = False
+                logger.debug("OCR not available (pytesseract/PIL not installed)")
+                return None
+            
+            if not OCR_AVAILABLE:
+                return None
+            
+            # Load and process image
+            image = Image.open(screenshot_path)
+            
+            # Extract text using OCR
+            text = pytesseract.image_to_string(image)
+            logger.debug(f"OCR extracted text length: {len(text)}")
+            
+            # Search for BSR pattern in OCR text
+            bsr_patterns = [
+                r'Best\s+Sellers\s+Rank:\s*#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
+                r'Best\s+Sellers\s+Rank[:\s]*#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle',
+                r'#(\d{1,3}(?:,\d{3})*)\s+in\s+Kindle\s+Store',
+            ]
+            
+            for pattern in bsr_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    try:
+                        bsr_str = match.group(1).replace(',', '')
+                        bsr_value = int(bsr_str)
+                        if 1 <= bsr_value < 10000000:
+                            logger.info(f"✅ BSR extracted from screenshot OCR: #{bsr_value:,}")
+                            return bsr_value
+                    except (ValueError, AttributeError):
+                        continue
+            
+            logger.debug("BSR not found in OCR text")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error extracting BSR from screenshot: {e}")
+            return None
+    
     async def fetch_page(self, url: str, timeout: int = 30000) -> Tuple[Optional[str], Optional[str]]:
         """
         Fetch page HTML with production-ready error handling

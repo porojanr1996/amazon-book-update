@@ -458,7 +458,37 @@ class BrowserPool:
                             
                             if clicked:
                                 # Wait a bit more for the expanded content to load
-                                await page.wait_for_timeout(random.uniform(1000, 2000))
+                                await page.wait_for_timeout(random.uniform(2000, 3000))
+                                
+                                # Take screenshot after clicking "See all details"
+                                try:
+                                    import os
+                                    from pathlib import Path
+                                    screenshot_dir = Path(os.getenv('SCREENSHOT_DIR', '/tmp/amazon_screenshots'))
+                                    screenshot_dir.mkdir(parents=True, exist_ok=True)
+                                    
+                                    # Generate screenshot filename with timestamp and URL hash
+                                    import hashlib
+                                    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+                                    timestamp = int(time.time())
+                                    screenshot_path = screenshot_dir / f"amazon_bsr_{timestamp}_{url_hash}.png"
+                                    
+                                    # Take full page screenshot
+                                    await page.screenshot(path=str(screenshot_path), full_page=True)
+                                    logger.info(f"📸 Screenshot saved: {screenshot_path}")
+                                    
+                                    # Also try to extract BSR from screenshot using OCR
+                                    bsr_from_screenshot = await self._extract_bsr_from_screenshot(str(screenshot_path))
+                                    if bsr_from_screenshot:
+                                        logger.info(f"✅ BSR extracted from screenshot: #{bsr_from_screenshot:,}")
+                                        # Return early with BSR from screenshot
+                                        duration = time.time() - start_time
+                                        self.metrics.record_request(duration, success=True)
+                                        await self._save_storage_state()
+                                        return f"<html><body>BSR from screenshot: {bsr_from_screenshot}</body></html>", None
+                                except Exception as e:
+                                    logger.warning(f"Could not take/process screenshot: {e}")
+                                
                                 break  # Found and clicked, no need to continue scrolling
                         except Exception as e:
                             logger.debug(f"Error looking for 'See all details': {e}")

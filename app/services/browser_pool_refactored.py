@@ -277,11 +277,45 @@ class BrowserPool:
     async def _dismiss_popups(self, page: Page):
         """
         Dismiss common pop-ups that appear on Amazon pages
-        (cookie consent, promotional modals, newsletter signups, etc.)
+        (cookie consent, promotional modals, newsletter signups, delivery address notifications, etc.)
         """
         try:
+            # Wait a bit for pop-ups to appear (they may load after page content)
+            await page.wait_for_timeout(1500)
+            
+            # First, check for delivery address notification modal by text content
+            # This is a common modal that appears early on Amazon pages
+            try:
+                page_text = await page.inner_text('body')
+                if 'dispatch to' in page_text.lower() or 'delivery address' in page_text.lower():
+                    logger.info("Detected delivery address notification modal - attempting to dismiss")
+                    # Try to find and click the Dismiss button
+                    dismiss_selectors = [
+                        'button:has-text("Dismiss")',
+                        'button:has-text("dismiss")',
+                        'a:has-text("Dismiss")',
+                        '[data-action="dismiss"]',
+                    ]
+                    for selector in dismiss_selectors:
+                        try:
+                            element = await page.query_selector(selector)
+                            if element and await element.is_visible():
+                                logger.info(f"Clicking Dismiss button (selector: {selector})")
+                                await element.click(timeout=2000)
+                                await page.wait_for_timeout(1000)
+                                break
+                        except:
+                            continue
+            except Exception as e:
+                logger.debug(f"Error checking for delivery address modal: {e}")
+            
             # Common pop-up selectors for Amazon
             popup_selectors = [
+                # Amazon delivery address notification (priority - appears early)
+                'button:has-text("Dismiss")',  # Delivery address modal dismiss button
+                'button:has-text("dismiss")',  # Case-insensitive
+                '[data-action="dismiss"]',
+                
                 # Cookie consent
                 '#sp-cc-accept',  # Amazon cookie consent accept button
                 'button[id*="accept"]',
@@ -300,7 +334,6 @@ class BrowserPool:
                 'button:has-text("✕")',
                 
                 # Promotional modals
-                '[data-action="dismiss"]',
                 'button:has-text("No thanks")',
                 'button:has-text("Not now")',
                 'button:has-text("Skip")',
@@ -319,7 +352,6 @@ class BrowserPool:
             dismissed = False
             for selector in popup_selectors:
                 try:
-                    # Wait a bit for pop-up to appear
                     element = await page.query_selector(selector)
                     if element:
                         # Check if element is visible

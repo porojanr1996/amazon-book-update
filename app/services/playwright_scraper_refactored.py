@@ -110,39 +110,55 @@ def extract_bsr_with_playwright_sync(amazon_url: str) -> Optional[int]:
     """
     Synchronous wrapper for extract_bsr_with_playwright
     Returns only BSR value (None if error or CAPTCHA)
+    
+    Uses asyncio.run() to create a fresh event loop for each call,
+    avoiding conflicts with existing event loops.
     """
     try:
         logger.info(f"Starting BSR extraction for {amazon_url}")
         
+        # Check if we're in an async context (e.g., FastAPI)
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError("Event loop is closed")
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, we need to run in a thread
+            import concurrent.futures
+            import threading
+            
+            def run_in_thread():
+                """Run async code in a new thread with its own event loop"""
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(asyncio.wait_for(
+                        extract_bsr_with_playwright(amazon_url),
+                        timeout=120.0
+                    ))
+                finally:
+                    new_loop.close()
+            
+            # Run in a thread pool to avoid blocking
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(run_in_thread)
+                bsr, error_reason = future.result(timeout=125.0)  # Slightly longer than async timeout
+            
         except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        try:
-            bsr, error_reason = loop.run_until_complete(asyncio.wait_for(
+            # No running event loop - safe to use asyncio.run()
+            bsr, error_reason = asyncio.run(asyncio.wait_for(
                 extract_bsr_with_playwright(amazon_url),
-                timeout=120.0  # 2 minute timeout
+                timeout=120.0
             ))
-            
-            if error_reason == "captcha":
-                logger.warning(f"CAPTCHA detected - returning None (reason: {error_reason})")
-                return None
-            
-            logger.info(f"BSR extraction completed: {bsr}")
-            return bsr
         
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout extracting BSR for {amazon_url}")
+        if error_reason == "captcha":
+            logger.warning(f"CAPTCHA detected - returning None (reason: {error_reason})")
             return None
-        except Exception as e:
-            logger.error(f"Error in synchronous BSR extraction: {e}", exc_info=True)
-            return None
+        
+        logger.info(f"BSR extraction completed: {bsr}")
+        return bsr
     
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout extracting BSR for {amazon_url}")
+        return None
     except Exception as e:
-        logger.error(f"Error setting up synchronous BSR extraction: {e}", exc_info=True)
+        logger.error(f"Error in synchronous BSR extraction: {e}", exc_info=True)
         return None
 

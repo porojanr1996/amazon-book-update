@@ -155,10 +155,10 @@ def extract_bsr_with_playwright_sync(amazon_url: str) -> Optional[int]:
         
         logger.info(f"BSR extraction completed: {bsr}")
         return bsr
-    
-        except asyncio.TimeoutError:
-            logger.error(f"Timeout extracting BSR for {amazon_url} (timeout: 300s)")
-            return None
+        
+    except asyncio.TimeoutError:
+        logger.error(f"Timeout extracting BSR for {amazon_url} (timeout: 300s)")
+        return None
     except Exception as e:
         logger.error(f"Error in synchronous BSR extraction: {e}", exc_info=True)
         return None

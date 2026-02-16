@@ -656,7 +656,10 @@ class BrowserPool:
 
 
 # Global pool instance (singleton)
-_pool: Optional[BrowserPool] = None
+# Use thread-local storage for browser pools to avoid event loop conflicts
+import threading
+_thread_local = threading.local()
+
 _pool_lock = Lock()
 
 

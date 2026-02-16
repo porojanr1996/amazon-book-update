@@ -42,7 +42,8 @@ async def extract_bsr_with_playwright(amazon_url: str) -> Tuple[Optional[int], O
     
     try:
         logger.debug(f"Fetching page with Playwright for BSR: {clean_url}")
-        html, error_reason, bsr_from_screenshot = await fetch_page(clean_url, timeout=30000)
+        # Increased timeout to 60 seconds to account for delays and slow navigation
+        html, error_reason, bsr_from_screenshot = await fetch_page(clean_url, timeout=60000)
         
         # If BSR was extracted from screenshot OCR, return it directly
         if bsr_from_screenshot:
@@ -131,7 +132,7 @@ def extract_bsr_with_playwright_sync(amazon_url: str) -> Optional[int]:
                 try:
                     return new_loop.run_until_complete(asyncio.wait_for(
                         extract_bsr_with_playwright(amazon_url),
-                        timeout=120.0
+                        timeout=300.0  # 5 minutes (to account for delays + navigation)
                     ))
                 finally:
                     new_loop.close()
@@ -139,13 +140,13 @@ def extract_bsr_with_playwright_sync(amazon_url: str) -> Optional[int]:
             # Run in a thread pool to avoid blocking
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(run_in_thread)
-                bsr, error_reason = future.result(timeout=125.0)  # Slightly longer than async timeout
+                bsr, error_reason = future.result(timeout=310.0)  # Slightly longer than async timeout
             
         except RuntimeError:
             # No running event loop - safe to use asyncio.run()
             bsr, error_reason = asyncio.run(asyncio.wait_for(
                 extract_bsr_with_playwright(amazon_url),
-                timeout=120.0
+                timeout=300.0  # 5 minutes (to account for delays + navigation)
             ))
         
         if error_reason == "captcha":

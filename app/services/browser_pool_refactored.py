@@ -104,7 +104,7 @@ class BrowserPool:
         
         # Create lock in current event loop (thread-local)
         if self._init_lock is None or self._init_lock._loop is not loop:
-            self._init_lock = asyncio.Lock()
+                self._init_lock = asyncio.Lock()
         
         # Use asyncio lock for async initialization
         async with self._init_lock:
@@ -274,6 +274,82 @@ class BrowserPool:
         network_indicators = ['timeout', 'connection', 'network', 'reset', 'refused', 'econnreset']
         return any(indicator in error_str for indicator in network_indicators)
     
+    async def _dismiss_popups(self, page: Page):
+        """
+        Dismiss common pop-ups that appear on Amazon pages
+        (cookie consent, promotional modals, newsletter signups, etc.)
+        """
+        try:
+            # Common pop-up selectors for Amazon
+            popup_selectors = [
+                # Cookie consent
+                '#sp-cc-accept',  # Amazon cookie consent accept button
+                'button[id*="accept"]',
+                'button:has-text("Accept")',
+                'button:has-text("Accept Cookies")',
+                'button:has-text("Accept All")',
+                'a[id*="accept"]',
+                
+                # Close buttons (X buttons)
+                'button[aria-label*="Close"]',
+                'button[aria-label*="close"]',
+                'button.close',
+                '.a-button-close',
+                '[data-action="close"]',
+                'button:has-text("×")',
+                'button:has-text("✕")',
+                
+                # Promotional modals
+                '[data-action="dismiss"]',
+                'button:has-text("No thanks")',
+                'button:has-text("Not now")',
+                'button:has-text("Skip")',
+                'button:has-text("Maybe later")',
+                
+                # Newsletter signup dismiss
+                'button:has-text("No, thanks")',
+                'button:has-text("Not interested")',
+                
+                # Location permission
+                'button:has-text("Not now")',
+                'button:has-text("Block")',
+            ]
+            
+            # Try to find and click any visible pop-up close button
+            dismissed = False
+            for selector in popup_selectors:
+                try:
+                    # Wait a bit for pop-up to appear
+                    element = await page.query_selector(selector)
+                    if element:
+                        # Check if element is visible
+                        is_visible = await element.is_visible()
+                        if is_visible:
+                            logger.info(f"Found pop-up, dismissing with selector: {selector}")
+                            await element.click(timeout=2000)
+                            await page.wait_for_timeout(1000)  # Wait for pop-up to close
+                            dismissed = True
+                            break
+                except Exception as e:
+                    # Selector didn't match or element not clickable, continue
+                    continue
+            
+            # Also try to press Escape key to close any modal
+            if not dismissed:
+                try:
+                    await page.keyboard.press('Escape')
+                    await page.wait_for_timeout(500)
+                    logger.debug("Pressed Escape to dismiss any modal")
+                except:
+                    pass
+            
+            # Wait a bit more for any animations to complete
+            await page.wait_for_timeout(500)
+            
+        except Exception as e:
+            # Don't fail if pop-up dismissal fails - just log and continue
+            logger.debug(f"Error dismissing pop-ups (non-critical): {e}")
+    
     async def _save_storage_state(self):
         """Save browser storage state for session persistence"""
         try:
@@ -432,8 +508,12 @@ class BrowserPool:
                             else:
                                 raise
                     
-                    # Check for "Continue shopping" interstitial page and handle it
-                    await page.wait_for_timeout(2000)  # Wait for page to fully load
+                    # Wait for page to fully load
+                    await page.wait_for_timeout(2000)
+                    
+                    # Handle pop-ups (cookie consent, promotional modals, etc.)
+                    await self._dismiss_popups(page)
+                    
                     page_content = await page.content()
                     page_text = await page.inner_text('body')
                     

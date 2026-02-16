@@ -148,18 +148,18 @@ def extract_bsr_with_playwright_sync(amazon_url: str) -> Optional[int]:
                 extract_bsr_with_playwright(amazon_url),
                 timeout=300.0  # 5 minutes (to account for delays + navigation)
             ))
+            
+            if error_reason == "captcha":
+                logger.warning(f"CAPTCHA detected - returning None (reason: {error_reason})")
+                return None
+            
+            logger.info(f"BSR extraction completed: {bsr}")
+            return bsr
         
-        if error_reason == "captcha":
-            logger.warning(f"CAPTCHA detected - returning None (reason: {error_reason})")
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout extracting BSR for {amazon_url} (timeout: 300s)")
             return None
-        
-        logger.info(f"BSR extraction completed: {bsr}")
-        return bsr
-        
-    except asyncio.TimeoutError:
-        logger.error(f"Timeout extracting BSR for {amazon_url} (timeout: 300s)")
-        return None
-    except Exception as e:
-        logger.error(f"Error in synchronous BSR extraction: {e}", exc_info=True)
-        return None
+        except Exception as e:
+            logger.error(f"Error in synchronous BSR extraction: {e}", exc_info=True)
+            return None
 

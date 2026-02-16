@@ -664,13 +664,25 @@ _pool_lock = Lock()
 
 
 async def get_browser_pool(headless: Optional[bool] = None) -> BrowserPool:
-    """Get global browser pool instance (singleton)"""
-    global _pool
-    if _pool is None:
-        with _pool_lock:
-            if _pool is None:
-                _pool = BrowserPool(headless=headless)
-    return _pool
+    """
+    Get or create thread-local browser pool (thread-safe, avoids event loop conflicts)
+    
+    Args:
+        headless: Run browser in headless mode (None = auto-detect from env)
+        
+    Returns:
+        BrowserPool instance (one per thread)
+    """
+    # Get thread-local pool
+    if not hasattr(_thread_local, 'pool') or _thread_local.pool is None:
+        _thread_local.pool = BrowserPool(headless=headless)
+    
+    pool = _thread_local.pool
+    
+    if not pool._initialized:
+        await pool.initialize()
+    
+    return pool
 
 
 async def fetch_page(url: str, timeout: int = 30000) -> Tuple[Optional[str], Optional[str], Optional[int]]:

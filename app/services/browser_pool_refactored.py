@@ -59,10 +59,11 @@ class BrowserPool:
         self.playwright = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
-        self._lock = Lock()
+        self._lock = Lock()  # Threading lock for cross-thread synchronization
         self._initialized = False
-        self._init_lock = None
+        self._init_lock = None  # Will be created per event loop
         self._initializing = False
+        self._init_thread_lock = Lock()  # Threading lock for initialization check
         
         # Storage state path for session persistence
         storage_dir = Path(os.getenv('PLAYWRIGHT_STORAGE_DIR', '/tmp/playwright_storage'))
@@ -74,15 +75,42 @@ class BrowserPool:
     
     async def initialize(self):
         """Initialize browser (thread-safe, single browser only)"""
-        if self._init_lock is None:
+        # Use threading lock for cross-thread initialization check
+        with self._init_thread_lock:
+            if self._initialized:
+                return
+            
+            if self._initializing:
+                # Wait for initialization to complete
+                while self._initializing:
+                    await asyncio.sleep(0.1)
+                if self._initialized:
+                    return
+            
+            self._initializing = True
+        
+        # Create asyncio lock for current event loop (must be done in async context)
+        try:
+            # Get current event loop
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop, try to get existing one
             try:
-                self._init_lock = asyncio.Lock()
+                loop = asyncio.get_event_loop()
             except RuntimeError:
+                # No event loop exists, create new one
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                self._init_lock = asyncio.Lock()
         
+        # Create lock in current event loop (thread-local)
+        if self._init_lock is None or self._init_lock._loop is not loop:
+            self._init_lock = asyncio.Lock()
+        
+        # Use asyncio lock for async initialization
         async with self._init_lock:
+            # Double-check after acquiring async lock
+            if self._initialized:
+                return
             if self._initialized:
                 return
             

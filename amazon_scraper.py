@@ -84,8 +84,9 @@ class AmazonScraper:
             logger.info(f"UK domain detected, using Playwright for {amazon_url}")
             use_playwright = True
         else:
-            # For US domains, use simple requests method (faster and more reliable)
-            logger.info(f"US domain detected, using simple requests method for {amazon_url}")
+            # For US domains, FORCE simple requests method (faster and more reliable)
+            logger.info(f"US domain detected, forcing simple requests method for {amazon_url}")
+            use_playwright = False  # Force simple method for US
         
         # If Playwright is requested, use it directly
         if use_playwright:

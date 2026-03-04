@@ -1,0 +1,49 @@
+// Prisma schema for Amazon BSR Tracker
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id          String        @id @default(uuid())
+  asin        String        @unique
+  title       String
+  url         String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  rankHistory RankHistory[]
+
+  @@index([asin])
+}
+
+model RankHistory {
+  id        String   @id @default(uuid())
+  bookId    String
+  rank      Int
+  category  String
+  timestamp DateTime @default(now())
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId])
+  @@index([timestamp])
+}
+
+model ScrapingError {
+  id          String   @id @default(uuid())
+  asin        String
+  url         String
+  errorMsg    String
+  stackTrace  String?
+  htmlSnippet String?
+  screenshot  String?  // Path to screenshot file
+  selector    String?
+  timestamp   DateTime @default(now())
+
+  @@index([asin])
+  @@index([timestamp])
+}
